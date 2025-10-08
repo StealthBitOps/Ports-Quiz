@@ -95,10 +95,9 @@ if st.button("Generate Quiz"):
     st.session_state.submitted = False
     st.session_state.current_q = 0
 
-# ============================================================
-# ⏱️ SECTION 3: Quiz Flow with Timer and Answer Input
-# ============================================================
-
+# -----------------------------
+# ⏱️ Quiz Flow with Timer and Answer Input
+# -----------------------------
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
     if q_index < len(st.session_state.questions):
@@ -123,12 +122,12 @@ if "questions" in st.session_state and not st.session_state.submitted:
         else:
             answer = st.text_input("Your answer:", key=key)
 
-        # Timeout logic
+        # Auto-submit after timeout
         if remaining == 0 and f"{key}_submitted" not in st.session_state:
             st.session_state.answers[key] = "No answer"
             st.session_state[f"{key}_submitted"] = True
-            st.warning("⏱️ Time's up! Moving to next question...")
             st.session_state.current_q += 1
+            st.session_state[f"{key}_start_time"] = None
             st.experimental_rerun()
 
         # Manual Next button
@@ -137,6 +136,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.session_state.answers[key] = answer if answer else "No answer"
                 st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
+            st.session_state[f"{key}_start_time"] = None
             st.experimental_rerun()
 
 # ============================================================
@@ -221,4 +221,5 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
