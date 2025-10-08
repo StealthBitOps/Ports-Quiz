@@ -90,7 +90,7 @@ if "questions" not in st.session_state or st.session_state.get("quiz_complete"):
         st.rerun()
 
 # ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 4: Quiz Flow with Timer                            │
+# │ SECTION 4: Quiz Flow with Timer and Conditional Buttons    │
 # └────────────────────────────────────────────────────────────┘
 
 if "questions" in st.session_state and not st.session_state.quiz_complete:
@@ -98,15 +98,18 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
     question = st.session_state.questions[q_index]
     key = f"q_{q_index}"
 
+    # Initialize timer and state
     if f"timer_{key}" not in st.session_state:
         st.session_state[f"timer_{key}"] = 10
         st.session_state[f"submitted_{key}"] = False
         st.session_state[f"timeout_{key}"] = False
         st.session_state[f"answer_{key}"] = ""
 
+    # Display question and timer
     st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
     st.markdown(f"⏳ Time remaining: `{st.session_state[f'timer_{key}']}` seconds")
 
+    # Show question
     if question["type"] == "mc":
         selected = st.radio(question["question"], question["options"], key=f"input_{key}")
     elif question["type"] == "tf":
@@ -116,25 +119,29 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
 
     st.session_state[f"answer_{key}"] = selected
 
+    # Countdown logic
     if st.session_state[f"timer_{key}"] > 0 and not st.session_state[f"submitted_{key}"]:
         time.sleep(1)
         st.session_state[f"timer_{key}"] -= 1
         st.rerun()
 
+    # Timeout reached
     if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"submitted_{key}"]:
         st.session_state.answers[key] = selected or ""
         st.session_state[f"timeout_{key}"] = True
         st.markdown("⏱️ Time's up! Answer saved. Click **Next** to continue.")
 
-    if selected and not st.session_state[f"timeout_{key}"] and not st.session_state[f"submitted_{key}"]:
-        if st.button("Submit"):
-            st.session_state.answers[key] = selected
-            st.session_state[f"submitted_{key}"] = True
-            st.session_state.current_question += 1
-            if st.session_state.current_question >= st.session_state.num_questions:
-                st.session_state.quiz_complete = True
-            st.rerun()
+    # Submit button (always visible, enabled only if answer selected and timer active)
+    submit_disabled = not selected or st.session_state[f"timeout_{key}"] or st.session_state[f"submitted_{key}"]
+    if st.button("Submit", disabled=submit_disabled):
+        st.session_state.answers[key] = selected
+        st.session_state[f"submitted_{key}"] = True
+        st.session_state.current_question += 1
+        if st.session_state.current_question >= st.session_state.num_questions:
+            st.session_state.quiz_complete = True
+        st.rerun()
 
+    # Next button (only after timeout)
     if st.session_state[f"timeout_{key}"]:
         if st.button("Next"):
             st.session_state.current_question += 1
@@ -281,3 +288,4 @@ if st.session_state.get("quiz_complete"):
         st.session_state.pop("correct_count", None)
         st.session_state.pop("start_time", None)
         st.rerun()
+
