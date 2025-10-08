@@ -95,6 +95,51 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         st.rerun()
 
 # ┌───────────────────────────────────────────────┐
+# │ SECTION 3: Welcome Screen and Quiz Setup      │
+# └───────────────────────────────────────────────┘
+
+st.title("🧠 Network Protocol Quiz")
+st.markdown("Test your knowledge of ports, protocols, and OSI layers!")
+
+difficulty = st.select_slider("Choose difficulty", options=["Easy", "Medium", "Hard"])
+num_questions = st.slider("How many questions?", min_value=1, max_value=20, value=5)
+
+if st.button("Start Quiz"):
+    st.session_state.difficulty = difficulty
+    st.session_state.num_questions = num_questions
+    st.session_state.current_question = 0
+    st.session_state.answers = {}
+    st.session_state.start_time = time.time()
+    st.session_state.questions = generate_questions(protocols, difficulty, num_questions)
+    st.session_state.quiz_complete = False
+    st.rerun()
+
+# ┌───────────────────────────────────────────────┐
+# │ SECTION 4: Quiz Flow                          │
+# └───────────────────────────────────────────────┘
+
+if "questions" in st.session_state and not st.session_state.quiz_complete:
+    q_index = st.session_state.current_question
+    question = st.session_state.questions[q_index]
+    st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
+    st.markdown(f"⏱️ Time elapsed: {round(time.time() - st.session_state.start_time, 2)} seconds")
+
+    key = f"q_{q_index}"
+    if question["type"] == "mc":
+        answer = st.radio(question["question"], question["options"], key=key)
+    elif question["type"] == "tf":
+        answer = st.radio(question["question"], ["True", "False"], key=key)
+    else:
+        answer = st.text_input(question["question"], key=key)
+
+    if st.button("Next"):
+        st.session_state.answers[key] = answer
+        st.session_state.current_question += 1
+        if st.session_state.current_question >= st.session_state.num_questions:
+            st.session_state.quiz_complete = True
+        st.rerun()
+
+# ┌───────────────────────────────────────────────┐
 # │ SECTION 5: Review Logic (Safe + Detailed)     │
 # └───────────────────────────────────────────────┘
 
@@ -145,3 +190,48 @@ if "questions" in st.session_state and st.session_state.get("quiz_complete"):
 
 else:
     st.info("No completed quiz to review yet.")
+
+# ┌───────────────────────────────────────────────┐
+# │ SECTION 6: Leaderboard Tracking               │
+# └───────────────────────────────────────────────┘
+
+# Initialize leaderboard and attempt counter
+if "leaderboard" not in st.session_state:
+    st.session_state.leaderboard = []
+if "attempt_count" not in st.session_state:
+    st.session_state.attempt_count = 0
+
+# Calculate score
+difficulty_weights = {"Easy": 1, "Medium": 2, "Hard": 3}
+correct = correct_count
+total = len(st.session_state.questions)
+elapsed = round(time.time() - st.session_state.start_time, 2)
+score = round((correct * difficulty_weights[st.session_state.difficulty]) / max(elapsed, 1), 4)
+
+# Save attempt
+st.session_state.attempt_count += 1
+attempt_name = f"Attempt {st.session_state.attempt_count}"
+st.session_state.leaderboard.append({
+    "name": attempt_name,
+    "difficulty": st.session_state.difficulty,
+    "correct": correct,
+    "total": total,
+    "time": elapsed,
+    "score": score
+})
+
+# Keep top 10
+st.session_state.leaderboard = sorted(
+    st.session_state.leaderboard,
+    key=lambda x: x["score"],
+    reverse=True
+)[:10]
+
+# Display leaderboard
+st.markdown("## 🏆 Leaderboard (Top 10 Attempts)")
+for entry in st.session_state.leaderboard:
+    st.markdown(
+        f"- **{entry['name']}** | Difficulty: {entry['difficulty']} | "
+        f"Score: `{entry['score']}` | Correct: {entry['correct']}/{entry['total']} | "
+        f"Time: {entry['time']}s"
+    )
