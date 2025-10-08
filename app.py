@@ -109,7 +109,7 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
     st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
     st.markdown(f"⏳ Time remaining: `{st.session_state[f'timer_{key}']}` seconds")
 
-    # Show question
+    # Show question and capture answer
     if question["type"] == "mc":
         selected = st.radio(question["question"], question["options"], key=f"input_{key}")
     elif question["type"] == "tf":
@@ -131,15 +131,16 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         st.session_state[f"timeout_{key}"] = True
         st.markdown("⏱️ Time's up! Answer saved. Click **Next** to continue.")
 
-    # Submit button (always visible, enabled only if answer selected and timer active)
-    submit_disabled = not selected or st.session_state[f"timeout_{key}"] or st.session_state[f"submitted_{key}"]
-    if st.button("Submit", disabled=submit_disabled):
-        st.session_state.answers[key] = selected
-        st.session_state[f"submitted_{key}"] = True
-        st.session_state.current_question += 1
-        if st.session_state.current_question >= st.session_state.num_questions:
-            st.session_state.quiz_complete = True
-        st.rerun()
+    # Submit button (always visible, disabled until answer is selected, hidden after timeout)
+    if not st.session_state[f"timeout_{key}"]:
+        submit_disabled = not selected or st.session_state[f"submitted_{key}"]
+        if st.button("Submit", disabled=submit_disabled):
+            st.session_state.answers[key] = selected
+            st.session_state[f"submitted_{key}"] = True
+            st.session_state.current_question += 1
+            if st.session_state.current_question >= st.session_state.num_questions:
+                st.session_state.quiz_complete = True
+            st.rerun()
 
     # Next button (only after timeout)
     if st.session_state[f"timeout_{key}"]:
@@ -288,4 +289,5 @@ if st.session_state.get("quiz_complete"):
         st.session_state.pop("correct_count", None)
         st.session_state.pop("start_time", None)
         st.rerun()
+
 
