@@ -121,10 +121,12 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
 # │ Purpose: Show correct answers, explanations, and score     │
 # └────────────────────────────────────────────────────────────┘
 
+# Initialize correct_count outside the conditional so it's accessible globally
+correct_count = 0
+
 if "questions" in st.session_state and st.session_state.get("quiz_complete"):
     st.markdown("## 🔍 Quiz Review")
 
-    correct_count = 0
     layer_map = {
         1: "Physical", 2: "Data Link", 3: "Network",
         4: "Transport", 5: "Session", 6: "Presentation", 7: "Application"
@@ -168,16 +170,17 @@ if "attempt_count" not in st.session_state:
 start_time = st.session_state.get("start_time", time.time())
 elapsed = round(time.time() - start_time, 2)
 
-# Calculate score using difficulty weight
+# Safely get difficulty
+difficulty = st.session_state.get("difficulty", "Easy")
 difficulty_weights = {"Easy": 1, "Medium": 2, "Hard": 3}
-score = round((correct_count * difficulty_weights.get(st.session_state.difficulty, 1)) / max(elapsed, 1), 4)
+score = round((correct_count * difficulty_weights.get(difficulty, 1)) / max(elapsed, 1), 4)
 
 # Save attempt
 st.session_state.attempt_count += 1
 attempt_name = f"Attempt {st.session_state.attempt_count}"
 st.session_state.leaderboard.append({
     "name": attempt_name,
-    "difficulty": st.session_state.difficulty,
+    "difficulty": difficulty,
     "correct": correct_count,
     "total": len(st.session_state.questions),
     "time": elapsed,
