@@ -149,7 +149,7 @@ if st.button("Generate Quiz"):
 # 🔁 Safe rerun trigger if timeout or "Next" was clicked
 if st.session_state.get("trigger_rerun"):
     st.session_state.trigger_rerun = False
-    st.stop()  # ✅ Safe halt to allow rerun
+    st.stop()  # Safely halt execution to allow Streamlit to rerun
 
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
@@ -157,14 +157,15 @@ if "questions" in st.session_state and not st.session_state.submitted:
         q = st.session_state.questions[q_index]
         st.markdown(f"**Question {q_index + 1} of {len(st.session_state.questions)}**")
         st.markdown(f"**{q['question']}**")
+
         key = f"q_{q_index}"
+        start_time_key = f"{key}_start_time"
 
-        # Start timer if not already started
-        if f"{key}_start_time" not in st.session_state:
-            st.session_state[f"{key}_start_time"] = time.time()
+        # ✅ Safe timer initialization
+        if start_time_key not in st.session_state:
+            st.session_state[start_time_key] = time.time()
 
-        # Calculate remaining time
-        elapsed = time.time() - st.session_state[f"{key}_start_time"]
+        elapsed = time.time() - st.session_state[start_time_key]
         remaining = max(0, 10 - int(elapsed))
         st.markdown(f"⏳ Time left: {remaining} seconds")
 
@@ -184,7 +185,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
             st.session_state.answers[key] = "No answer"
             st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
-            st.session_state[f"{key}_start_time"] = None
+            st.session_state[start_time_key] = None
             st.session_state.trigger_rerun = True  # ✅ Set rerun flag
 
         # Manual Next button
@@ -193,7 +194,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.session_state.answers[key] = answer if answer else "No answer"
                 st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
-            st.session_state[f"{key}_start_time"] = None
+            st.session_state[start_time_key] = None
             st.session_state.trigger_rerun = True  # ✅ Set rerun flag
 
 # ============================================================
@@ -280,6 +281,7 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
 
 
