@@ -45,21 +45,22 @@ protocols = [
 
 import datetime
 
-def record_attempt(name, score, time_taken, difficulty):
+def record_attempt(score, time_taken, difficulty):
+    if "session_leaderboard" not in st.session_state:
+        st.session_state.session_leaderboard = []
+    attempt_number = len(st.session_state.session_leaderboard) + 1
     attempt = {
-        "Name": name,
+        "Attempt": f"Attempt {attempt_number}",
         "Score": score,
         "Time": time_taken,
         "Difficulty": difficulty,
         "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-    if "session_leaderboard" not in st.session_state:
-        st.session_state.session_leaderboard = []
     st.session_state.session_leaderboard.append(attempt)
 
 def get_top_attempts(n=5):
     if "session_leaderboard" not in st.session_state:
-        return pd.DataFrame(columns=["Name", "Score", "Time", "Difficulty", "Timestamp"])
+        return pd.DataFrame(columns=["Attempt", "Score", "Time", "Difficulty", "Timestamp"])
     df = pd.DataFrame(st.session_state.session_leaderboard)
     return df.sort_values(by=["Score", "Time"], ascending=[False, True]).head(n)
 
@@ -225,9 +226,9 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         st.session_state.quiz_complete = True
         st.rerun()
 
-# ┌───────────────────────────────────────────────┐
-# │ SECTION 6: Completion, Review, Restart, Leader│
-# └───────────────────────────────────────────────┘
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 6: Completion, Review, Restart, Leaderboard, Export│
+# └────────────────────────────────────────────────────────────┘
 
 if "questions" in st.session_state and st.session_state.quiz_complete:
     st.markdown("## ✅ Quiz Complete!")
@@ -268,29 +269,35 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
     st.session_state.final_score = correct_count
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
 
-    # 🔁 Restart Quiz Option
-    if st.button("🔄 Restart Quiz"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+    # 🧾 Automatically record attempt
+    if "attempt_recorded" not in st.session_state:
+        difficulty = st.session_state.get("difficulty", "Not set")
+        record_attempt(correct_count, st.session_state.total_time, difficulty)
+        st.session_state.attempt_recorded = True
         st.rerun()
 
-    # 📝 Leaderboard Submission (Session-Based)
-    if "score_submitted" not in st.session_state:
-        with st.form("submit_score_form"):
-            name = st.text_input("Enter your name for the leaderboard (or leave blank for Anonymous):")
-            submitted = st.form_submit_button("Submit Score")
-            if submitted:
-                if not name.strip():
-                    name = "Anonymous"
-                difficulty = st.session_state.difficulty if "difficulty" in st.session_state else "Unknown"
-                record_attempt(name, st.session_state.final_score, st.session_state.total_time, difficulty)
-                st.session_state.score_submitted = True
-                st.rerun()
+    # 🔁 Restart Quiz Option (preserves leaderboard)
+    if st.button("🔄 Restart Quiz"):
+        preserved_leaderboard = st.session_state.session_leaderboard
+        st.session_state.clear()
+        st.session_state.session_leaderboard = preserved_leaderboard
+        st.rerun()
 
     # 🏆 Leaderboard Preview (Top 5 from session)
     st.markdown("## 🏆 Leaderboard Preview")
     top5 = get_top_attempts()
     if top5.empty:
-        st.info("Leaderboard is currently empty. Be the first to submit your score!")
+        st.info("Leaderboard is currently empty. Take a quiz to see your results!")
     else:
         st.dataframe(top5, use_container_width=True)
+
+    # 📄 PDF Export Button
+    if st.button("📥 Download Review as PDF"):
+        st.session_state.export_requested = True
+        st.rerun()
+
+# Trigger PDF export if requested
+if "export_requested" in st.session_state and st.session_state.export_requested:
+    st.session_state.export_requested = False
+    st.markdown("Generating your PDF review summary…")
+    # PDF generation is handled separately and will appear as a download link
