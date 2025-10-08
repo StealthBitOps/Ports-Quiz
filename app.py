@@ -231,24 +231,6 @@ if "questions" in st.session_state and st.session_state.quiz_complete:
             st.session_state.review_ready = True
             st.rerun()
 
-    if "review_ready" not in st.session_state:
-        st.markdown("### 🧮 Final Score: Not yet reviewed")
-        name = st.text_input("Enter your name for the leaderboard (or leave blank for Anonymous):")
-        if st.button("Submit Score"):
-            if not name.strip():
-                name = "Anonymous"
-            leaderboard = load_leaderboard()
-            new_entry = pd.DataFrame([{
-                "Name": name,
-                "Score": "Pending",
-                "Time": st.session_state.total_time
-            }])
-            updated = pd.concat([leaderboard, new_entry], ignore_index=True)
-            top30 = save_leaderboard(updated)
-            st.session_state.leaderboard = top30
-            st.session_state.score_submitted = True
-            st.rerun()
-
 if "review_ready" in st.session_state and st.session_state.review_ready:
     st.markdown("## 🔍 Review Your Answers")
 
@@ -263,6 +245,7 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
             st.markdown(f"### Q{i+1}: {q['question']}")
             st.markdown(f"- Your answer: `{user_answer}`")
             st.markdown(f"- Correct answer: `{correct_answer}`")
+            st.markdown(f"- {'✅ Correct!' if is_correct else '❌ Incorrect.'}")
             st.markdown(f"- Explanation: {q['explanation']['correct']}")
 
             if q["type"] == "mc":
