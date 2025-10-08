@@ -142,12 +142,11 @@ if st.button("Generate Quiz"):
     st.session_state.submitted = False
     st.session_state.current_q = 0
     st.session_state.start_time = time.time()
-    
+
 # ============================================================
 # ⏱️ SECTION 3: Quiz Flow with Timer and Answer Input
 # ============================================================
 
-# Safe rerun trigger
 if st.session_state.get("trigger_rerun"):
     st.session_state.trigger_rerun = False
     st.stop()
@@ -173,30 +172,40 @@ if "questions" in st.session_state and not st.session_state.submitted:
         # 🔁 Auto-refresh every second
         st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
 
-        # ✅ Input field handling
         submitted = False
         answer = None
 
-        if q["type"] == "mc":
-            answer = st.radio("Choose one:", q["options"], key=key)
-        elif q["type"] == "tf":
-            answer = st.radio("True or False:", ["True", "False"], key=key)
-        else:
+        # ✅ Multiple Choice and True/False using selectbox
+        if q["type"] in ["mc", "tf"]:
+            options = q["options"] if q["type"] == "mc" else ["True", "False"]
+            select_key = f"select_{q_index}"
+            default_option = "— Select an answer —"
+            options_with_default = [default_option] + options
+
+            selected = st.selectbox("Choose one:", options_with_default, key=select_key)
+            if selected != default_option:
+                answer = selected
+                if st.button("Submit"):
+                    submitted = True
+            else:
+                st.button("Submit", disabled=True)
+
+        # ✅ Fill-in-the-blank with Enter key and Submit button
+        elif q["type"] == "fill":
             input_key = f"user_input_{q_index}"
             if input_key not in st.session_state:
                 st.session_state[input_key] = ""
 
-            # ✅ Use form to capture Enter key
             with st.form(key=f"form_{q_index}"):
                 st.session_state[input_key] = st.text_input("Your answer:", value=st.session_state[input_key])
-                submitted = st.form_submit_button("Next")
+                submitted = st.form_submit_button("Submit")
 
             answer = st.session_state[input_key]
-
-        # ✅ Manual Next button for MC and TF
-        if q["type"] in ["mc", "tf"]:
-            if st.button("Next"):
-                submitted = True
+            if not submitted and answer.strip():
+                if st.button("Submit"):
+                    submitted = True
+            elif not answer.strip():
+                st.button("Submit", disabled=True)
 
         # ✅ Handle submission
         if submitted and f"{key}_submitted" not in st.session_state:
@@ -206,13 +215,15 @@ if "questions" in st.session_state and not st.session_state.submitted:
             st.session_state[start_time_key] = None
             st.session_state.trigger_rerun = True
 
-        # ✅ Auto-submit after timeout
+        # ✅ Show Next button only after timeout
         if remaining == 0 and f"{key}_submitted" not in st.session_state:
-            st.session_state.answers[key] = "No answer"
-            st.session_state[f"{key}_submitted"] = True
-            st.session_state.current_q += 1
-            st.session_state[start_time_key] = None
-            st.session_state.trigger_rerun = True
+            st.markdown("⏱ Time's up! You can still submit your answer.")
+            if st.button("Next"):
+                st.session_state.answers[key] = answer if answer else "No answer"
+                st.session_state[f"{key}_submitted"] = True
+                st.session_state.current_q += 1
+                st.session_state[start_time_key] = None
+                st.session_state.trigger_rerun = True
 
 # ============================================================
 # ✅ SECTION 4: Submission, Feedback, Leaderboard, PDF Export
@@ -298,6 +309,7 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
 
 
