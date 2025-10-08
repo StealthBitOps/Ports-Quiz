@@ -162,15 +162,17 @@ if "questions" in st.session_state and not st.session_state.submitted:
         start_time_key = f"{key}_start_time"
 
         # ✅ Safe timer initialization
-        if start_time_key not in st.session_state:
+        if start_time_key not in st.session_state or st.session_state[start_time_key] is None:
             st.session_state[start_time_key] = time.time()
 
+        # ✅ Timer logic
         elapsed = time.time() - st.session_state[start_time_key]
         remaining = max(0, 10 - int(elapsed))
         st.markdown(f"⏳ Time left: {remaining} seconds")
 
-        # 🔁 Auto-refresh every second
-        st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
+        # ✅ Refresh only if timer is active
+        if remaining > 0:
+            st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
 
         submitted = False
         answer = None
@@ -179,23 +181,15 @@ if "questions" in st.session_state and not st.session_state.submitted:
         if q["type"] in ["mc", "tf"]:
             options = q["options"] if q["type"] == "mc" else ["True", "False"]
             radio_key = f"radio_{q_index}"
-            clear_key = f"clear_{q_index}"
 
-            # Initialize selection
             if radio_key not in st.session_state:
                 st.session_state[radio_key] = None
 
-            # Show radio buttons
             selected = st.radio("Choose one:", options, key=radio_key)
-
-            # Clear selection button
-            if st.button("Clear selection", key=clear_key):
-                st.session_state[radio_key] = None
-                st.experimental_rerun()
+            answer = selected
 
             # Enable submit only if selected
-            if st.session_state[radio_key] is not None:
-                answer = st.session_state[radio_key]
+            if selected:
                 if st.button("Submit"):
                     submitted = True
             else:
@@ -320,6 +314,7 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
 
 
