@@ -155,13 +155,19 @@ if "questions" in st.session_state and not st.session_state.submitted:
 
         elapsed = time.time() - st.session_state[start_time_key]
         remaining = max(0, 10 - int(elapsed))
-        st.markdown(f"**Question {q_index + 1} of {len(questions)}**")
-        st.markdown(f"**{q['question']}**")
-        st.markdown(f"⏳ Time left: {remaining} seconds")
+
+        # Fun emoji countdown
+        if remaining > 0:
+            st.markdown(f"🔥 {remaining} seconds remaining!")
+        else:
+            st.markdown("⏰ Time's up!")
 
         # Refresh only if timer is active and not submitted
         if remaining > 0 and submitted_key not in st.session_state:
             st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
+
+        st.markdown(f"**Question {q_index + 1} of {len(questions)}**")
+        st.markdown(f"**{q['question']}**")
 
         answer = None
         submitted = False
@@ -204,7 +210,6 @@ if "questions" in st.session_state and not st.session_state.submitted:
         # Timer expired — show Next button
         if remaining == 0 and submitted_key not in st.session_state:
             st.session_state.answers[key] = answer if answer else "No answer"
-            st.markdown("⏱ Time's up! You can still review your answer.")
             st.button("Submit", disabled=True)
             if st.button("Next"):
                 st.session_state[submitted_key] = True
