@@ -162,9 +162,9 @@ if "questions" in st.session_state and not st.session_state.submitted:
         else:
             st.markdown("⏰ Time's up!")
 
-        # Refresh only if timer is active and not submitted
-        if remaining > 0 and submitted_key not in st.session_state:
-            st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
+        # Force refresh every second for 11 seconds
+        if submitted_key not in st.session_state:
+            st_autorefresh(interval=1000, limit=11, key=f"refresh_{key}")
 
         st.markdown(f"**Question {q_index + 1} of {len(questions)}**")
         st.markdown(f"**{q['question']}**")
@@ -215,6 +215,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.session_state[submitted_key] = True
                 st.session_state.current_q += 1
                 st.session_state[start_time_key] = None
+                # ✅ Only rerun if there are more questions
                 if st.session_state.current_q < len(st.session_state.questions):
                     st.experimental_rerun()
 
