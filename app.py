@@ -57,10 +57,6 @@ def update_leaderboard(name, score, time_taken):
     save_leaderboard(board)
     return board
 
-# ============================================================
-# 🧠 SECTION 2: Welcome Screen and Quiz Setup
-# ============================================================
-
 st.title("🧠 TCP/UDP Protocol Quiz")
 st.markdown("Welcome! Select difficulty and number of questions to begin.")
 
@@ -68,9 +64,8 @@ difficulty = st.select_slider("Select difficulty", options=["Easy", "Medium", "H
 num_questions = st.slider("Number of questions", min_value=3, max_value=len(protocols), value=5)
 
 if st.button("Generate Quiz"):
-    # Clear previous state
     for key in list(st.session_state.keys()):
-        if key.startswith("q_") or key.startswith("user_input_") or key.endswith("_start_time") or key.startswith("radio_") or key.endswith("_submitted"):
+        if key.startswith("q_") or key.startswith("user_input_") or key.endswith("_start_time") or key.startswith("radio_") or key.endswith("_submitted") or key.startswith("score_"):
             del st.session_state[key]
 
     def generate_questions(difficulty, num_questions):
@@ -84,12 +79,7 @@ if st.button("Generate Quiz"):
             proto = protocols[idx]
             used_indices.add(idx)
 
-            if difficulty == "Easy":
-                q_type = "mc"
-            elif difficulty == "Medium":
-                q_type = random.choice(["mc", "fill"])
-            else:
-                q_type = random.choice(["fill", "tf", "layer", "acronym"])
+            q_type = "mc" if difficulty == "Easy" else random.choice(["mc", "fill", "tf", "layer", "acronym"])
 
             if q_type == "mc":
                 options = random.sample([p["name"] for p in protocols if p["name"] != proto["name"]], 3)
@@ -99,25 +89,29 @@ if st.button("Generate Quiz"):
                     "type": "mc",
                     "question": f"Which protocol matches this description: '{proto['description']}'?",
                     "options": options,
-                    "answer": proto["name"]
+                    "answer": proto["name"],
+                    "explanation": f"{proto['name']} matches this description because it {proto['description'].lower()}."
                 })
             elif q_type == "fill":
                 questions.append({
                     "type": "fill",
                     "question": f"Which protocol uses port {proto['port']}?",
-                    "answer": proto["name"]
+                    "answer": proto["name"],
+                    "explanation": f"{proto['name']} uses port {proto['port']} for its communication."
                 })
             elif q_type == "layer":
                 questions.append({
                     "type": "fill",
                     "question": f"Which layer does {proto['name']} operate on?",
-                    "answer": proto["layer"]
+                    "answer": proto["layer"],
+                    "explanation": f"{proto['name']} operates on the {proto['layer']} layer of the TCP/IP model."
                 })
             elif q_type == "acronym":
                 questions.append({
                     "type": "fill",
                     "question": f"What does the acronym {proto['name']} stand for?",
-                    "answer": proto["acronym"]
+                    "answer": proto["acronym"],
+                    "explanation": f"{proto['name']} stands for {proto['acronym']}."
                 })
             else:
                 correct = "True" if proto["reliable"] else "False"
@@ -125,7 +119,8 @@ if st.button("Generate Quiz"):
                     "type": "tf",
                     "question": f"True or False: {proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}.",
                     "options": ["True", "False"],
-                    "answer": correct
+                    "answer": correct,
+                    "explanation": f"{proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'} because it {'uses' if proto['reliable'] else 'does not use'} connection-oriented delivery."
                 })
 
         return questions
@@ -134,10 +129,7 @@ if st.button("Generate Quiz"):
     st.session_state.answers = {}
     st.session_state.submitted = False
     st.session_state.current_q = 0
-
-# ============================================================
-# ⏱️ SECTION 3: Quiz Flow with Timer and Answer Input
-# ============================================================
+    st.session_state.total_time = 0
 
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
@@ -149,20 +141,17 @@ if "questions" in st.session_state and not st.session_state.submitted:
         start_time_key = f"{key}_start_time"
         submitted_key = f"{key}_submitted"
 
-        # Timer setup
         if start_time_key not in st.session_state:
             st.session_state[start_time_key] = time.time()
 
         elapsed = time.time() - st.session_state[start_time_key]
         remaining = max(0, 10 - int(elapsed))
 
-        # Fun emoji countdown
         if remaining > 0:
             st.markdown(f"🔥 {remaining} seconds remaining!")
         else:
             st.markdown("⏰ Time's up!")
 
-        # Force refresh every second for 11 seconds
         if submitted_key not in st.session_state:
             st_autorefresh(interval=1000, limit=11, key=f"refresh_{key}")
 
@@ -172,7 +161,6 @@ if "questions" in st.session_state and not st.session_state.submitted:
         answer = None
         submitted = False
 
-        # Multiple Choice and True/False
         if q["type"] in ["mc", "tf"]:
             options = q["options"]
             radio_key = f"radio_{q_index}"
@@ -180,14 +168,10 @@ if "questions" in st.session_state and not st.session_state.submitted:
             answer = selected
 
             if remaining > 0:
-                if selected:
-                    if st.button("Submit"):
-                        st.markdown("✅ Answer submitted!")
-                        submitted = True
-                else:
-                    st.button("Submit", disabled=True)
+                if selected and st.button("Submit"):
+                    submitted = True
+                    st.markdown("✅ Answer submitted!")
 
-        # Fill-in-the-blank
         elif q["type"] == "fill":
             input_key = f"user_input_{q_index}"
             if input_key not in st.session_state:
@@ -201,18 +185,18 @@ if "questions" in st.session_state and not st.session_state.submitted:
 
             answer = st.session_state[input_key]
 
-        # Handle submission
         if submitted and submitted_key not in st.session_state:
             st.session_state.answers[key] = answer if answer else "No answer"
+            st.session_state.total_time += int(elapsed)
             st.session_state[submitted_key] = True
             st.session_state.current_q += 1
             st.session_state[start_time_key] = None
             if st.session_state.current_q < len(st.session_state.questions):
                 st.experimental_rerun()
 
-        # Timer expired — show Next button
         if remaining == 0 and submitted_key not in st.session_state:
             st.session_state.answers[key] = answer if answer else "No answer"
+            st.session_state.total_time += 10
             st.button("Submit", disabled=True)
             if st.button("Next"):
                 st.session_state[submitted_key] = True
@@ -220,10 +204,6 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.session_state[start_time_key] = None
                 if st.session_state.current_q < len(st.session_state.questions):
                     st.experimental_rerun()
-
-# ============================================================
-# 🏁 SECTION 4: Quiz Completion Screen
-# ============================================================
 
 if "questions" in st.session_state and not st.session_state.submitted:
     if st.session_state.current_q >= len(st.session_state.questions):
@@ -233,18 +213,46 @@ if "questions" in st.session_state and not st.session_state.submitted:
             st.session_state.submitted = True
             st.experimental_rerun()
 
-# ============================================================
-# 📋 SECTION 5: Review Answers
-# ============================================================
-
 if "questions" in st.session_state and st.session_state.submitted:
     st.markdown("🎉 Here are your answers:")
 
+    correct_count = 0
     for i, q in enumerate(st.session_state.questions):
         key = f"q_{i}"
         user_answer = st.session_state.answers.get(key, "No answer")
         correct_answer = q["answer"]
+        is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
+
         st.markdown(f"**Q{i+1}: {q['question']}**")
         st.markdown(f"- Your answer: `{user_answer}`")
         st.markdown(f"- Correct answer: `{correct_answer}`")
+        st.markdown(f"- {'✅ Correct!' if is_correct else '❌ Incorrect.'}")
+        st.markdown(f"- Explanation: {q['explanation']}")
         st.markdown("---")
+
+        if is_correct:
+            correct_count += 1
+
+    st.session_state.score = correct_count
+    st.markdown(f"**Your score: {correct_count} / {len(st.session_state.questions)}**")
+    name = st.text_input("Enter your name for the leaderboard (or leave blank for Anonymous):")
+    if st.button("Submit Score"):
+        if not name.strip():
+            name = "Anonymous"
+        if "leaderboard" not in st.session_state:
+            st.session_state.leaderboard = []
+        st.session_state.leaderboard.append({
+            "name": name,
+            "score": correct_count,
+            "time": st.session_state.total_time
+        })
+        st.session_state.leaderboard = sorted(
+            st.session_state.leaderboard,
+            key=lambda x: (-x["score"], x["time"])
+        )[:30]
+        st.experimental_rerun()
+
+if "leaderboard" in st.session_state and st.session_state.submitted:
+    st.markdown("🏆 **Leaderboard** (Top 30)")
+    for i, entry in enumerate(st.session_state.leaderboard):
+        st.markdown(f"{i+1}. **{entry['name']}** — {entry['score']} pts in {entry['time']}s")
