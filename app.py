@@ -175,16 +175,27 @@ if "questions" in st.session_state and not st.session_state.submitted:
         submitted = False
         answer = None
 
-        # ✅ Multiple Choice and True/False using selectbox
+        # ✅ Multiple Choice and True/False using radio buttons
         if q["type"] in ["mc", "tf"]:
             options = q["options"] if q["type"] == "mc" else ["True", "False"]
-            select_key = f"select_{q_index}"
-            default_option = "— Select an answer —"
-            options_with_default = [default_option] + options
+            radio_key = f"radio_{q_index}"
+            clear_key = f"clear_{q_index}"
 
-            selected = st.selectbox("Choose one:", options_with_default, key=select_key)
-            if selected != default_option:
-                answer = selected
+            # Initialize selection
+            if radio_key not in st.session_state:
+                st.session_state[radio_key] = None
+
+            # Show radio buttons
+            selected = st.radio("Choose one:", options, key=radio_key)
+
+            # Clear selection button
+            if st.button("Clear selection", key=clear_key):
+                st.session_state[radio_key] = None
+                st.experimental_rerun()
+
+            # Enable submit only if selected
+            if st.session_state[radio_key] is not None:
+                answer = st.session_state[radio_key]
                 if st.button("Submit"):
                     submitted = True
             else:
@@ -309,6 +320,7 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
 
 
