@@ -182,6 +182,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
             if remaining > 0:
                 if selected:
                     if st.button("Submit"):
+                        st.markdown("✅ Answer submitted!")
                         submitted = True
                 else:
                     st.button("Submit", disabled=True)
@@ -195,6 +196,8 @@ if "questions" in st.session_state and not st.session_state.submitted:
             with st.form(key=f"form_{q_index}"):
                 st.session_state[input_key] = st.text_input("Your answer:", value=st.session_state[input_key])
                 submitted = st.form_submit_button("Submit")
+                if submitted:
+                    st.markdown("✅ Answer submitted!")
 
             answer = st.session_state[input_key]
 
@@ -215,7 +218,6 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.session_state[submitted_key] = True
                 st.session_state.current_q += 1
                 st.session_state[start_time_key] = None
-                # ✅ Only rerun if there are more questions
                 if st.session_state.current_q < len(st.session_state.questions):
                     st.experimental_rerun()
 
