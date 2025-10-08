@@ -1,6 +1,5 @@
 # ┌───────────────────────────────────────────────┐
 # │ SECTION 1: Imports and Protocol Dataset       │
-# │ Purpose: Load libraries and define quiz data  │
 # └───────────────────────────────────────────────┘
 
 import streamlit as st
@@ -16,10 +15,9 @@ protocols = [
     {"name": "ICMP", "acronym": "ICMP", "port": "0-255", "description": "Troubleshoots network issues", "osi_layer": 3, "difficulty": "Hard"},
 ]
 
-# ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 2: Question Generator                              │
-# │ Purpose: Create randomized questions based on difficulty   │
-# └────────────────────────────────────────────────────────────┘
+# ┌───────────────────────────────────────────────┐
+# │ SECTION 2: Question Generator                 │
+# └───────────────────────────────────────────────┘
 
 def generate_questions(data, difficulty, count):
     pool = [p for p in data if p["difficulty"] == difficulty]
@@ -68,10 +66,9 @@ def generate_questions(data, difficulty, count):
 
     return questions
 
-# ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 3: Welcome Screen and Quiz Setup                   │
-# │ Purpose: Let user choose difficulty and start the quiz     │
-# └────────────────────────────────────────────────────────────┘
+# ┌───────────────────────────────────────────────┐
+# │ SECTION 3: Welcome Screen and Quiz Setup      │
+# └───────────────────────────────────────────────┘
 
 if "questions" not in st.session_state or st.session_state.quiz_complete:
     st.title("🧠 Network Protocol Quiz")
@@ -90,10 +87,9 @@ if "questions" not in st.session_state or st.session_state.quiz_complete:
         st.session_state.quiz_complete = False
         st.rerun()
 
-# ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 4: Quiz Flow                                       │
-# │ Purpose: Show one question at a time and record answers    │
-# └────────────────────────────────────────────────────────────┘
+# ┌───────────────────────────────────────────────┐
+# │ SECTION 4: Quiz Flow                          │
+# └───────────────────────────────────────────────┘
 
 if "questions" in st.session_state and not st.session_state.quiz_complete:
     q_index = st.session_state.current_question
@@ -116,12 +112,10 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
             st.session_state.quiz_complete = True
         st.rerun()
 
-# ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 5: Review Screen                                   │
-# │ Purpose: Show correct answers, explanations, and score     │
-# └────────────────────────────────────────────────────────────┘
+# ┌───────────────────────────────────────────────┐
+# │ SECTION 5: Review Screen                      │
+# └───────────────────────────────────────────────┘
 
-# Initialize correct_count outside the conditional so it's accessible globally
 correct_count = 0
 
 if "questions" in st.session_state and st.session_state.get("quiz_complete"):
@@ -155,12 +149,10 @@ if "questions" in st.session_state and st.session_state.get("quiz_complete"):
 
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
 
-# ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 6: Leaderboard Tracking                            │
-# │ Purpose: Track top 10 attempts by score and show ranking   │
-# └────────────────────────────────────────────────────────────┘
+# ┌───────────────────────────────────────────────┐
+# │ SECTION 6: Leaderboard Tracking               │
+# └───────────────────────────────────────────────┘
 
-# Initialize leaderboard and attempt counter if missing
 if "leaderboard" not in st.session_state:
     st.session_state.leaderboard = []
 if "attempt_count" not in st.session_state:
@@ -170,7 +162,7 @@ if "attempt_count" not in st.session_state:
 start_time = st.session_state.get("start_time", time.time())
 elapsed = round(time.time() - start_time, 2)
 
-# Safely get difficulty
+# Safely get difficulty and score
 difficulty = st.session_state.get("difficulty", "Easy")
 difficulty_weights = {"Easy": 1, "Medium": 2, "Hard": 3}
 score = round((correct_count * difficulty_weights.get(difficulty, 1)) / max(elapsed, 1), 4)
@@ -178,11 +170,13 @@ score = round((correct_count * difficulty_weights.get(difficulty, 1)) / max(elap
 # Save attempt
 st.session_state.attempt_count += 1
 attempt_name = f"Attempt {st.session_state.attempt_count}"
+total_questions = len(st.session_state.questions) if "questions" in st.session_state else 0
+
 st.session_state.leaderboard.append({
     "name": attempt_name,
     "difficulty": difficulty,
     "correct": correct_count,
-    "total": len(st.session_state.questions),
+    "total": total_questions,
     "time": elapsed,
     "score": score
 })
@@ -202,3 +196,4 @@ for entry in st.session_state.leaderboard:
         f"Score: `{entry['score']}` | Correct: {entry['correct']}/{entry['total']} | "
         f"Time: {entry['time']}s"
     )
+
