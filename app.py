@@ -70,7 +70,7 @@ num_questions = st.slider("Number of questions", min_value=3, max_value=len(prot
 if st.button("Generate Quiz"):
     # Clear previous state
     for key in list(st.session_state.keys()):
-        if key.startswith("q_") or key.startswith("user_input_") or key.endswith("_start_time") or key.startswith("radio_"):
+        if key.startswith("q_") or key.startswith("user_input_") or key.endswith("_start_time") or key.startswith("radio_") or key.endswith("_submitted"):
             del st.session_state[key]
 
     def generate_questions(difficulty, num_questions):
@@ -124,6 +124,7 @@ if st.button("Generate Quiz"):
                 questions.append({
                     "type": "tf",
                     "question": f"True or False: {proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}.",
+                    "options": ["True", "False"],
                     "answer": correct
                 })
 
@@ -140,43 +141,46 @@ if st.button("Generate Quiz"):
 
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
-    if q_index < len(st.session_state.questions):
-        q = st.session_state.questions[q_index]
-        st.markdown(f"**Question {q_index + 1} of {len(st.session_state.questions)}**")
-        st.markdown(f"**{q['question']}**")
+    questions = st.session_state.questions
 
+    if q_index < len(questions):
+        q = questions[q_index]
         key = f"q_{q_index}"
         start_time_key = f"{key}_start_time"
         submitted_key = f"{key}_submitted"
 
-        # ✅ Timer setup
+        # Timer setup
         if start_time_key not in st.session_state:
             st.session_state[start_time_key] = time.time()
 
         elapsed = time.time() - st.session_state[start_time_key]
         remaining = max(0, 10 - int(elapsed))
+        st.markdown(f"**Question {q_index + 1} of {len(questions)}**")
+        st.markdown(f"**{q['question']}**")
         st.markdown(f"⏳ Time left: {remaining} seconds")
 
+        # Refresh only if timer is active and not submitted
         if remaining > 0 and submitted_key not in st.session_state:
             st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
 
         answer = None
         submitted = False
 
-        # ✅ Multiple Choice and True/False
+        # Multiple Choice and True/False
         if q["type"] in ["mc", "tf"]:
-            options = q["options"] if q["type"] == "mc" else ["True", "False"]
+            options = q["options"]
             radio_key = f"radio_{q_index}"
             selected = st.radio("Choose one:", options, key=radio_key)
             answer = selected
 
-            if selected:
-                if st.button("Submit"):
-                    submitted = True
-            else:
-                st.button("Submit", disabled=True)
+            if remaining > 0:
+                if selected:
+                    if st.button("Submit"):
+                        submitted = True
+                else:
+                    st.button("Submit", disabled=True)
 
-        # ✅ Fill-in-the-blank
+        # Fill-in-the-blank
         elif q["type"] == "fill":
             input_key = f"user_input_{q_index}"
             if input_key not in st.session_state:
@@ -188,7 +192,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
 
             answer = st.session_state[input_key]
 
-        # ✅ Handle submission
+        # Handle submission
         if submitted and submitted_key not in st.session_state:
             st.session_state.answers[key] = answer if answer else "No answer"
             st.session_state[submitted_key] = True
@@ -196,107 +200,31 @@ if "questions" in st.session_state and not st.session_state.submitted:
             st.session_state[start_time_key] = None
             st.experimental_rerun()
 
-        # ✅ Show Next button after timeout
+        # Timer expired — show Next button
         if remaining == 0 and submitted_key not in st.session_state:
-            st.markdown("⏱ Time's up! You can still submit your answer.")
+            st.session_state.answers[key] = answer if answer else "No answer"
+            st.markdown("⏱ Time's up! You can still review your answer.")
+            st.button("Submit", disabled=True)
             if st.button("Next"):
-                st.session_state.answers[key] = answer if answer else "No answer"
                 st.session_state[submitted_key] = True
                 st.session_state.current_q += 1
                 st.session_state[start_time_key] = None
                 st.experimental_rerun()
 
 # ============================================================
-# ✅ SECTION 4: Submission, Feedback, Leaderboard, PDF Export
+# 🏁 SECTION 4: Quiz Completion
 # ============================================================
 
-if "questions" in st.session_state and not st.session_state.submitted and st.session_state.current_q >= len(st.session_state.questions):
-    score = 0
-    results = []
-    end_time = time.time()
-    total_time = end_time - st.session_state.get("start_time", end_time)
+if "questions" in st.session_state and not st.session_state.submitted:
+    if st.session_state.current_q >= len(st.session_state.questions):
+        st.session_state.submitted = True
+        st.markdown("🎉 Quiz complete! Here are your answers:")
 
-    # Evaluate answers
-    for i, q in enumerate(st.session_state.questions):
-        user_answer = st.session_state.answers.get(f"q_{i}", "")
-        correct = user_answer.strip().lower() == q["answer"].strip().lower()
-        if correct:
-            score += 1
-        result = {
-            "question": q["question"],
-            "user_answer": user_answer,
-            "answer": q["answer"],
-            "type": q["type"]
-        }
-        if q["type"] == "mc":
-            result["explanations"] = q["explanations"]
-        else:
-            result["explanation"] = q["explanation"]
-        results.append(result)
-
-    st.session_state.submitted = True
-    st.success(f"✅ You scored {score} out of {len(st.session_state.questions)} in {round(total_time, 2)} seconds")
-
-    # Show detailed feedback
-    for r in results:
-        st.markdown(f"**Q:** {r['question']}")
-        st.markdown(f"- Your answer: `{r['user_answer']}`")
-        st.markdown(f"- Correct answer: `{r['answer']}`")
-        if r["type"] == "mc":
-            st.markdown("**Option explanations:**")
-            for opt, exp in r["explanations"].items():
-                st.markdown(f"- `{opt}`: {exp}")
-        else:
-            st.markdown(f"- Explanation: {r['explanation']}")
-        st.markdown("---")
-
-    # Leaderboard entry
-    name = st.text_input("🏅 Enter your name for the leaderboard (or leave blank for anonymous):")
-    if st.button("Submit to Leaderboard"):
-        display_name = name.strip() if name.strip() else "Anonymous"
-        leaderboard = update_leaderboard(display_name, score, total_time)
-        st.success("Your score has been submitted!")
-
-        st.subheader("📊 Leaderboard")
-        for i, entry in enumerate(leaderboard[:10], start=1):
-            st.markdown(f"{i}. **{entry['name']}** — {entry['score']} pts in {entry['time']}s")
-
-    # PDF export
-    def generate_pdf(results, score, total, difficulty, name):
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=11)
-        pdf.cell(200, 10, txt=f"{name}'s Quiz Results", ln=True, align="C")
-        pdf.cell(200, 10, txt=f"Score: {score}/{total} | Difficulty: {difficulty} | {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align="C")
-        pdf.ln(10)
-        for i, r in enumerate(results):
-            pdf.multi_cell(0, 10, txt=f"Q{i+1}: {r['question']}")
-            pdf.multi_cell(0, 10, txt=f"Your answer: {r['user_answer']}")
-            pdf.multi_cell(0, 10, txt=f"Correct answer: {r['answer']}")
-            if r["type"] == "mc":
-                for opt, exp in r["explanations"].items():
-                    pdf.multi_cell(0, 10, txt=f"- {opt}: {exp}")
-            else:
-                pdf.multi_cell(0, 10, txt=f"Explanation: {r['explanation']}")
-            pdf.ln(5)
-        pdf.output("quiz_results.pdf")
-
-    generate_pdf(results, score, len(st.session_state.questions), difficulty, name or "Anonymous")
-    with open("quiz_results.pdf", "rb") as f:
-        st.download_button("📄 Download PDF Results", f, file_name="quiz_results.pdf")
-
-# 🔄 Restart button
-if "questions" in st.session_state:
-    if st.button("🔄 Start Over"):
-        st.session_state.clear()
-        st.experimental_rerun()
-
-
-
-
-
-
-
-
-
-
+        for i, q in enumerate(st.session_state.questions):
+            key = f"q_{i}"
+            user_answer = st.session_state.answers.get(key, "No answer")
+            correct_answer = q["answer"]
+            st.markdown(f"**Q{i+1}: {q['question']}**")
+            st.markdown(f"- Your answer: `{user_answer}`")
+            st.markdown(f"- Correct answer: `{correct_answer}`")
+            st.markdown("---")
