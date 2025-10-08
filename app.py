@@ -1,6 +1,5 @@
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 1: Imports and Protocol Dataset                    │
-# │ Purpose: Load libraries and define quiz data               │
 # └────────────────────────────────────────────────────────────┘
 
 import streamlit as st
@@ -9,7 +8,6 @@ import time
 from io import BytesIO
 from fpdf import FPDF
 
-# Protocol dataset
 protocols = [
     {"name": "SSH", "acronym": "SSH", "port": "22", "description": "Secure remote login", "osi_layer": 7, "difficulty": "Easy"},
     {"name": "DNS", "acronym": "DNS", "port": "53", "description": "Resolves domain names", "osi_layer": 7, "difficulty": "Easy"},
@@ -21,7 +19,6 @@ protocols = [
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 2: Question Generator                              │
-# │ Purpose: Create randomized questions based on difficulty   │
 # └────────────────────────────────────────────────────────────┘
 
 def generate_questions(data, difficulty, count):
@@ -73,7 +70,6 @@ def generate_questions(data, difficulty, count):
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 3: Welcome Screen and Quiz Setup                   │
-# │ Purpose: Configure quiz settings and initialize state      │
 # └────────────────────────────────────────────────────────────┘
 
 if "questions" not in st.session_state or st.session_state.get("quiz_complete"):
@@ -95,7 +91,6 @@ if "questions" not in st.session_state or st.session_state.get("quiz_complete"):
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 4: Quiz Flow with Timer                            │
-# │ Purpose: Show question, countdown timer, and handle input  │
 # └────────────────────────────────────────────────────────────┘
 
 if "questions" in st.session_state and not st.session_state.quiz_complete:
@@ -149,7 +144,6 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 5: Review Screen                                   │
-# │ Purpose: Show correct answers, explanations, and score     │
 # └────────────────────────────────────────────────────────────┘
 
 correct_count = 0
@@ -184,11 +178,10 @@ if "questions" in st.session_state and st.session_state.get("quiz_complete"):
             correct_count += 1
 
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
-    st.session_state.correct_count = correct_count  # Save for later use
+    st.session_state.correct_count = correct_count
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 6: PDF Export                                      │
-# │ Purpose: Export full review as a downloadable PDF          │
 # └────────────────────────────────────────────────────────────┘
 
 if st.session_state.get("quiz_complete"):
@@ -233,7 +226,6 @@ if st.session_state.get("quiz_complete"):
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 7: Leaderboard                                     │
-# │ Purpose: Show top 10 attempts after review and PDF export  │
 # └────────────────────────────────────────────────────────────┘
 
 if st.session_state.get("quiz_complete"):
@@ -273,3 +265,19 @@ if st.session_state.get("quiz_complete"):
             f"Score: `{entry['score']}` | Correct: {entry['correct']}/{entry['total']} | "
             f"Time: {entry['time']}s"
         )
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 8: Restart Quiz Button                             │
+# └────────────────────────────────────────────────────────────┘
+
+if st.session_state.get("quiz_complete"):
+    if st.button("🔁 Restart Quiz"):
+        for key in list(st.session_state.keys()):
+            if key.startswith("q_") or key.startswith("timer_") or key.startswith("submitted_") or key.startswith("timeout_") or key.startswith("answer_"):
+                del st.session_state[key]
+        st.session_state.pop("questions", None)
+        st.session_state.pop("answers", None)
+        st.session_state.pop("current_question", None)
+        st.session_state.pop("quiz_complete", None)
+        st.session_state.pop("correct_count", None)
+        st.session_state.pop("start_time", None)
+        st.rerun()
