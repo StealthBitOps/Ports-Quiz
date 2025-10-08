@@ -157,7 +157,13 @@ if "questions" in st.session_state and not st.session_state.submitted:
         st.success(f"✅ You scored {score} out of {len(st.session_state.questions)}")
 
         for r in results:
-                st.markdown(f"- `{opt}`: {exp}")
+            st.markdown(f"**Q:** {r['question']}")
+            st.markdown(f"- Your answer: `{r['user_answer']}`")
+            st.markdown(f"- Correct answer: `{r['answer']}`")
+            if r["type"] == "mc":
+                st.markdown("**Option explanations:**")
+                for opt, exp in r["explanations"].items():
+                    st.markdown(f"- `{opt}`: {exp}")
             else:
                 st.markdown(f"- Explanation: {r['explanation']}")
             st.markdown("---")
@@ -169,3 +175,4 @@ if "questions" in st.session_state and not st.session_state.submitted:
 if st.button("Start Over"):
     st.session_state.clear()
     st.experimental_rerun()
+
