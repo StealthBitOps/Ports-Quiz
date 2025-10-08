@@ -4,31 +4,31 @@ from datetime import datetime
 import random
 
 # -----------------------------
-# Quiz Data
+# Protocol Data
 # -----------------------------
 protocols = [
-    {"name": "TCP", "type": "Connection-oriented", "port": "Varies", "reliable": True, "description": "Ensures reliable delivery of data."},
-    {"name": "UDP", "type": "Connectionless", "port": "Varies", "reliable": False, "description": "Faster but does not guarantee delivery."},
-    {"name": "HTTP", "type": "Application layer", "port": "80", "reliable": True, "description": "Used for web communication."},
-    {"name": "FTP", "type": "Application layer", "port": "21", "reliable": True, "description": "Used for file transfers."},
-    {"name": "DNS", "type": "Application layer", "port": "53", "reliable": False, "description": "Resolves domain names to IP addresses."},
-    {"name": "SMTP", "type": "Application layer", "port": "25", "reliable": True, "description": "Used for sending emails."},
-    {"name": "DHCP", "type": "Application layer", "port": "67/68", "reliable": False, "description": "Assigns IP addresses dynamically."},
+    {"name": "TCP", "acronym": "Transmission Control Protocol", "port": "Varies", "layer": "Transport", "reliable": True, "description": "Ensures reliable delivery of data."},
+    {"name": "UDP", "acronym": "User Datagram Protocol", "port": "Varies", "layer": "Transport", "reliable": False, "description": "Faster but does not guarantee delivery."},
+    {"name": "HTTP", "acronym": "HyperText Transfer Protocol", "port": "80", "layer": "Application", "reliable": True, "description": "Used for web communication."},
+    {"name": "FTP", "acronym": "File Transfer Protocol", "port": "21", "layer": "Application", "reliable": True, "description": "Used for file transfers."},
+    {"name": "DNS", "acronym": "Domain Name System", "port": "53", "layer": "Application", "reliable": False, "description": "Resolves domain names to IP addresses."},
+    {"name": "SMTP", "acronym": "Simple Mail Transfer Protocol", "port": "25", "layer": "Application", "reliable": True, "description": "Used for sending emails."},
+    {"name": "DHCP", "acronym": "Dynamic Host Configuration Protocol", "port": "67/68", "layer": "Application", "reliable": False, "description": "Assigns IP addresses dynamically."},
 ]
 
 # -----------------------------
 # Question Generator
 # -----------------------------
 def generate_questions(difficulty, num_questions):
-    used_protocols = set()
+    used = set()
     questions = []
 
     while len(questions) < num_questions:
-        available = [p for p in protocols if p["name"] not in used_protocols]
+        available = [p for p in protocols if p["name"] not in used]
         if not available:
             break
         proto = random.choice(available)
-        used_protocols.add(proto["name"])
+        used.add(proto["name"])
 
         if difficulty == "Easy":
             q_type = "mc"
@@ -41,21 +41,20 @@ def generate_questions(difficulty, num_questions):
             options = random.sample([p["name"] for p in protocols if p["name"] != proto["name"]], 3)
             options.append(proto["name"])
             random.shuffle(options)
-            explanation = f"{proto['name']} is correct because: {proto['description']}. Other options do not match this description."
+            explanations = {opt: next((p["description"] for p in protocols if p["name"] == opt), "No info") for opt in options}
             questions.append({
                 "type": "mc",
                 "question": f"Which protocol matches this description: '{proto['description']}'?",
                 "options": options,
                 "answer": proto["name"],
-                "explanation": explanation
+                "explanations": explanations
             })
         elif q_type == "fill":
-            explanation = f"{proto['name']} uses port {proto['port']}, which is unique to its function."
             questions.append({
                 "type": "fill",
                 "question": f"Which protocol uses port {proto['port']}?",
                 "answer": proto["name"],
-                "explanation": explanation
+                "explanation": f"{proto['name']} uses port {proto['port']} for {proto['description']}"
             })
         else:
             statement = f"{proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}."
@@ -84,7 +83,11 @@ def generate_pdf(results, score, total, difficulty):
         pdf.multi_cell(0, 10, txt=f"Q{i+1}: {r['question']}")
         pdf.multi_cell(0, 10, txt=f"Your answer: {r['user_answer']}")
         pdf.multi_cell(0, 10, txt=f"Correct answer: {r['answer']}")
-        pdf.multi_cell(0, 10, txt=f"Explanation: {r['explanation']}")
+        if r["type"] == "mc":
+            for opt, exp in r["explanations"].items():
+                pdf.multi_cell(0, 10, txt=f"- {opt}: {exp}")
+        else:
+            pdf.multi_cell(0, 10, txt=f"Explanation: {r['explanation']}")
         pdf.ln(5)
     pdf.output("quiz_results.pdf")
 
@@ -93,44 +96,65 @@ def generate_pdf(results, score, total, difficulty):
 # -----------------------------
 st.title("🧠 TCP/UDP Protocol Quiz")
 
-difficulty = st.select_slider("Select difficulty", options=["Easy", "Medium", "Hard"])
+difficulty = st.selectbox("Choose difficulty", ["Easy", "Medium", "Hard"])
 num_questions = st.slider("Number of questions", 3, 7, 5)
 
-if "questions" not in st.session_state:
+if st.button("Generate Quiz"):
     st.session_state.questions = generate_questions(difficulty, num_questions)
     st.session_state.answers = {}
+    st.session_state.submitted = False
 
-questions = st.session_state.questions
+if "questions" in st.session_state and not st.session_state.submitted:
+    st.subheader("Answer the questions:")
+    for i, q in enumerate(st.session_state.questions):
+        st.markdown(f"**Q{i+1}: {q['question']}**")
+        key = f"q_{i}"
+        if q["type"] == "mc":
+            st.session_state.answers[key] = st.radio("Choose one:", q["options"], key=key)
+        elif q["type"] == "tf":
+            st.session_state.answers[key] = st.radio("True or False:", ["True", "False"], key=key)
+        else:
+            st.session_state.answers[key] = st.text_input("Your answer:", key=key)
 
-st.subheader("Answer the questions:")
+    if st.button("Submit Quiz"):
+        score = 0
+        results = []
+        for i, q in enumerate(st.session_state.questions):
+            user_answer = st.session_state.answers.get(f"q_{i}", "")
+            correct = user_answer.strip().lower() == q["answer"].strip().lower()
+            if correct:
+                score += 1
+            result = {
+                "question": q["question"],
+                "user_answer": user_answer,
+                "answer": q["answer"],
+                "type": q["type"]
+            }
+            if q["type"] == "mc":
+                result["explanations"] = q["explanations"]
+            else:
+                result["explanation"] = q["explanation"]
+            results.append(result)
 
-for i, q in enumerate(questions):
-    st.markdown(f"**Q{i+1}: {q['question']}**")
-    key = f"q_{i}"
-    if q["type"] == "mc":
-        st.session_state.answers[key] = st.radio("Choose one:", q["options"], key=key)
-    elif q["type"] == "tf":
-        st.session_state.answers[key] = st.radio("True or False:", ["True", "False"], key=key)
-    else:
-        st.session_state.answers[key] = st.text_input("Your answer:", key=key)
+        st.session_state.submitted = True
+        st.success(f"✅ You scored {score} out of {len(st.session_state.questions)}")
 
-if st.button("Submit Quiz"):
-    score = 0
-    results = []
-    for i, q in enumerate(questions):
-        user_answer = st.session_state.answers.get(f"q_{i}", "")
-        correct = user_answer.strip().lower() == q["answer"].strip().lower()
-        if correct:
-            score += 1
-        results.append({
-            "question": q["question"],
-            "user_answer": user_answer,
-            "answer": q["answer"],
-            "explanation": q["explanation"]
-        })
-    st.success(f"✅ You scored {score} out of {len(questions)}")
-    for r in results:
-        st.markdown(f"**Q:** {r['question']}")
-        st.markdown(f"- Your answer: `{r['user_answer']}`")
+        for r in results:
+            st.markdown(f"**Q:** {r['question']}")
+            st.markdown(f"- Your answer: `{r['user_answer']}`")
+            st.markdown(f"- Correct answer: `{r['answer']}`")
+            if r["type"] == "mc":
+                st.markdown("**Option explanations:**")
+                for opt, exp in r["explanations"].items():
+                    st.markdown(f"- `{opt}`: {exp}")
+            else:
+                st.markdown(f"- Explanation: {r['explanation']}")
+            st.markdown("---")
 
+        generate_pdf(results, score, len(st.session_state.questions), difficulty)
+        with open("quiz_results.pdf", "rb") as f:
+            st.download_button("📄 Download PDF Results", f, file_name="quiz_results.pdf")
 
+if st.button("Start Over"):
+    st.session_state.clear()
+    st.experimental_rerun()
