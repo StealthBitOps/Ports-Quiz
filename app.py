@@ -43,19 +43,25 @@ protocols = [
 # │ SECTION 2: Leaderboard Utilities              │
 # └───────────────────────────────────────────────┘
 
-def load_leaderboard():
-    if os.path.exists(LEADERBOARD_FILE):
-        try:
-            return pd.read_html(LEADERBOARD_FILE)[0]
-        except Exception:
-            return pd.DataFrame(columns=["Name", "Score", "Time"])
-    return pd.DataFrame(columns=["Name", "Score", "Time"])
+import datetime
 
-def save_leaderboard(df):
-    df_sorted = df.sort_values(by=["Score", "Time"], ascending=[False, True]).head(MAX_LEADERBOARD_ENTRIES)
-    if not df_sorted.empty:
-        df_sorted.to_html(LEADERBOARD_FILE, index=False)
-    return df_sorted
+def record_attempt(name, score, time_taken, difficulty):
+    attempt = {
+        "Name": name,
+        "Score": score,
+        "Time": time_taken,
+        "Difficulty": difficulty,
+        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    if "session_leaderboard" not in st.session_state:
+        st.session_state.session_leaderboard = []
+    st.session_state.session_leaderboard.append(attempt)
+
+def get_top_attempts(n=5):
+    if "session_leaderboard" not in st.session_state:
+        return pd.DataFrame(columns=["Name", "Score", "Time", "Difficulty", "Timestamp"])
+    df = pd.DataFrame(st.session_state.session_leaderboard)
+    return df.sort_values(by=["Score", "Time"], ascending=[False, True]).head(n)
 
 # ┌───────────────────────────────────────────────┐
 # │ SECTION 3: Question Generator                 │
@@ -268,28 +274,23 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
             del st.session_state[key]
         st.rerun()
 
-    # 📝 Leaderboard Submission
+    # 📝 Leaderboard Submission (Session-Based)
     if "score_submitted" not in st.session_state:
-        name = st.text_input("Enter your name for the leaderboard (or leave blank for Anonymous):")
-        if st.button("Submit Score"):
-            if not name.strip():
-                name = "Anonymous"
-            leaderboard = load_leaderboard()
-            new_entry = pd.DataFrame([{
-                "Name": name,
-                "Score": st.session_state.final_score,
-                "Time": st.session_state.total_time
-            }])
-            updated = pd.concat([leaderboard, new_entry], ignore_index=True)
-            top30 = save_leaderboard(updated)
-            st.session_state.leaderboard = top30
-            st.session_state.score_submitted = True
-            st.rerun()
+        with st.form("submit_score_form"):
+            name = st.text_input("Enter your name for the leaderboard (or leave blank for Anonymous):")
+            submitted = st.form_submit_button("Submit Score")
+            if submitted:
+                if not name.strip():
+                    name = "Anonymous"
+                difficulty = st.session_state.difficulty if "difficulty" in st.session_state else "Unknown"
+                record_attempt(name, st.session_state.final_score, st.session_state.total_time, difficulty)
+                st.session_state.score_submitted = True
+                st.rerun()
 
-    # 🏆 Leaderboard Preview
+    # 🏆 Leaderboard Preview (Top 5 from session)
     st.markdown("## 🏆 Leaderboard Preview")
-    leaderboard = load_leaderboard()
-    if leaderboard.empty:
+    top5 = get_top_attempts()
+    if top5.empty:
         st.info("Leaderboard is currently empty. Be the first to submit your score!")
     else:
-        st.components.v1.html(leaderboard.to_html(index=False), height=600, scrolling=True)
+        st.dataframe(top5, use_container_width=True)
