@@ -169,15 +169,17 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         start_key = f"{key}_start"
         submit_key = f"{key}_submitted"
 
+        # Initialize timer for this question
         if start_key not in st.session_state:
             st.session_state[start_key] = time.time()
 
         elapsed = time.time() - st.session_state[start_key]
         remaining = max(0, 10 - int(elapsed))
 
+        # Show countdown and refresh until time runs out
         if submit_key not in st.session_state and remaining > 0:
             st.markdown(f"⏳ Time remaining: {remaining} seconds")
-            st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
+            st_autorefresh(interval=1000, limit=remaining, key=f"refresh_{key}")
 
         st.markdown(f"### Question {q_index + 1} of {len(questions)}")
         st.markdown(f"**{q['question']}**")
@@ -185,6 +187,7 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         answer = None
         submitted = False
 
+        # Multiple choice or true/false
         if q["type"] in ["mc", "tf"]:
             options = q["options"]
             selected = st.radio("Choose one:", options, key=f"radio_{q_index}")
@@ -192,12 +195,14 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
             if remaining > 0 and st.button("Submit"):
                 submitted = True
 
+        # Fill-in-the-blank
         elif q["type"] == "fill":
             user_input = st.text_input("Your answer:", key=f"input_{q_index}")
             answer = user_input
             if remaining > 0 and st.button("Submit"):
                 submitted = True
 
+        # Handle submission
         if submitted and submit_key not in st.session_state:
             st.session_state.answers[key] = answer if answer else "No answer"
             st.session_state.total_time += int(elapsed)
@@ -205,6 +210,7 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
             st.session_state.current_q += 1
             st.rerun()
 
+        # Handle timeout
         if remaining == 0 and submit_key not in st.session_state:
             st.session_state.answers[key] = "No answer"
             st.session_state.total_time += 10
@@ -218,16 +224,38 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         st.rerun()
 
 # ┌───────────────────────────────────────────────┐
-# │ SECTION 6: Completion and Review              │
+# │ SECTION 6: Completion, Review, and Leaderboard│
 # └───────────────────────────────────────────────┘
 
 if "questions" in st.session_state and st.session_state.quiz_complete:
     st.markdown("## ✅ Quiz Complete!")
-    st.markdown("Click below to review your answers.")
-    if st.button("Review Answers"):
-        st.session_state.review_ready = True
-        st.rerun()
 
+    # Show review button if not yet reviewed
+    if "review_ready" not in st.session_state:
+        if st.button("Review Answers"):
+            st.session_state.review_ready = True
+            st.rerun()
+
+    # Fallback: allow leaderboard submission even if review is skipped
+    if "review_ready" not in st.session_state:
+        st.markdown("### 🧮 Final Score: Not yet reviewed")
+        name = st.text_input("Enter your name for the leaderboard (or leave blank for Anonymous):")
+        if st.button("Submit Score"):
+            if not name.strip():
+                name = "Anonymous"
+            leaderboard = load_leaderboard()
+            new_entry = pd.DataFrame([{
+                "Name": name,
+                "Score": "Pending",
+                "Time": st.session_state.total_time
+            }])
+            updated = pd.concat([leaderboard, new_entry], ignore_index=True)
+            top30 = save_leaderboard(updated)
+            st.session_state.leaderboard = top30
+            st.session_state.score_submitted = True
+            st.rerun()
+
+# Review answers and show leaderboard
 if "review_ready" in st.session_state and st.session_state.review_ready:
     st.markdown("## 🔍 Review Your Answers")
 
@@ -258,6 +286,25 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
     st.session_state.final_score = correct_count
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
 
+    # Leaderboard submission after review
+    if "score_submitted" not in st.session_state:
+        name = st.text_input("Enter your name for the leaderboard (or leave blank for Anonymous):")
+        if st.button("Submit Score"):
+            if not name.strip():
+                name = "Anonymous"
+            leaderboard = load_leaderboard()
+            new_entry = pd.DataFrame([{
+                "Name": name,
+                "Score": st.session_state.final_score,
+                "Time": st.session_state.total_time
+            }])
+            updated = pd.concat([leaderboard, new_entry], ignore_index=True)
+            top30 = save_leaderboard(updated)
+            st.session_state.leaderboard = top30
+            st.session_state.score_submitted = True
+            st.rerun()
 
-
-
+    # Always show leaderboard preview
+    st.markdown("## 🏆 Leaderboard Preview")
+    leaderboard = load_leaderboard()
+    st.components.v1.html(leaderboard.to_html(index=False), height=600, scrolling=True)
