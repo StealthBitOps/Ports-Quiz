@@ -153,7 +153,7 @@ if "questions" not in st.session_state:
         st.session_state.total_time = 0
         st.session_state.quiz_complete = False
         st.session_state.start_time = time.time()
-        st.experimental_rerun()
+        st.rerun()
 
 # ┌───────────────────────────────────────────────┐
 # │ SECTION 5: Quiz Flow and Timer Logic          │
@@ -203,7 +203,7 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
             st.session_state.total_time += int(elapsed)
             st.session_state[submit_key] = True
             st.session_state.current_q += 1
-            st.experimental_rerun()
+            st.rerun()
 
         if remaining == 0 and submit_key not in st.session_state:
             st.session_state.answers[key] = "No answer"
@@ -211,11 +211,11 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
             if st.button("Next"):
                 st.session_state[submit_key] = True
                 st.session_state.current_q += 1
-                st.experimental_rerun()
+                st.rerun()
 
     else:
         st.session_state.quiz_complete = True
-        st.experimental_rerun()
+        st.rerun()
 
 # ┌───────────────────────────────────────────────┐
 # │ SECTION 6: Completion and Review              │
@@ -226,7 +226,7 @@ if "questions" in st.session_state and st.session_state.quiz_complete:
     st.markdown("Click below to review your answers.")
     if st.button("Review Answers"):
         st.session_state.review_ready = True
-        st.experimental_rerun()
+        st.rerun()
 
 if "review_ready" in st.session_state and st.session_state.review_ready:
     st.markdown("## 🔍 Review Your Answers")
@@ -257,6 +257,7 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
 
     st.session_state.final_score = correct_count
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
+
 
 
 
