@@ -124,16 +124,70 @@ def generate_questions(difficulty, num_questions):
     return questions
 
 # -----------------------------
-# 📄 PDF Generator
+# 🎉 Welcome Screen & Quiz Setup
 # -----------------------------
-def generate_pdf(results, score, total, difficulty, name):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=11)
-    pdf.cell(200, 10, txt=f"{name}'s Quiz Results", ln=True, align="C")
+st.title("🧠 TCP/UDP Protocol Quiz")
+st.markdown("Welcome! Test your knowledge of network protocols. Select your difficulty and number of questions to begin.")
+
+difficulty = st.select_slider("Select difficulty", options=["Easy", "Medium", "Hard"], value="Medium")
+num_questions = st.slider("Number of questions", 3, len(protocols), 5)
+
+if st.button("Generate Quiz"):
+    st.session_state.questions = generate_questions(difficulty, num_questions)
+    st.session_state.answers = {}
+    st.session_state.submitted = False
+    st.session_state.start_time = time.time()
+    st.session_state.current_q = 0
+    st.session_state.timer_start = None
 
 # -----------------------------
-# ✅ Submission and Feedback
+# ⏱️ Quiz Flow with Timer
+# -----------------------------
+if "questions" in st.session_state and not st.session_state.submitted:
+    q_index = st.session_state.current_q
+    if q_index < len(st.session_state.questions):
+        q = st.session_state.questions[q_index]
+        st.markdown(f"**Question {q_index + 1} of {len(st.session_state.questions)}**")
+        st.markdown(f"**{q['question']}**")
+        key = f"q_{q_index}"
+
+        # Start timer
+        if st.session_state.timer_start is None:
+            st.session_state.timer_start = time.time()
+
+        elapsed = time.time() - st.session_state.timer_start
+        remaining = max(0, 10 - int(elapsed))
+        st.markdown(f"⏳ Time left: {remaining} seconds")
+
+        # Show input field
+        if q["type"] == "mc":
+            answer = st.radio("Choose one:", q["options"], key=key)
+        elif q["type"] == "tf":
+            answer = st.radio("True or False:", ["True", "False"], key=key)
+        else:
+            answer = st.text_input("Your answer:", key=key)
+
+        # Timeout logic
+        if remaining == 0 and f"{key}_submitted" not in st.session_state:
+            st.session_state.answers[key] = "No answer"
+            st.session_state[f"{key}_submitted"] = True
+            st.warning("⏱️ Time's up! Moving to next question...")
+            time.sleep(1)
+            st.session_state.current_q += 1
+            st.session_state.timer_start = None
+            st.experimental_rerun()
+
+        # Next button logic
+        if st.button("Next"):
+            if f"{key}_submitted" not in st.session_state:
+                st.session_state.answers[key] = answer if answer else "No answer"
+                st.session_state[f"{key}_submitted"] = True
+            st.session_state.current_q += 1
+            st.session_state.timer_start = None
+            st.experimental_rerun()
+
+# -----------------------------
+# ✅ Submission & Feedback
 # -----------------------------
 if "questions" in st.session_state and not st.session_state.submitted and st.session_state.current_q >= len(st.session_state.questions):
     score = 0
@@ -189,6 +243,25 @@ if "questions" in st.session_state and not st.session_state.submitted and st.ses
 # -----------------------------
 # 📄 PDF Export
 # -----------------------------
+    def generate_pdf(results, score, total, difficulty, name):
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=11)
+        pdf.cell(200, 10, txt=f"{name}'s Quiz Results", ln=True, align="C")
+        pdf.cell(200, 10, txt=f"Score: {score}/{total} | Difficulty: {difficulty} | {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align="C")
+        pdf.ln(10)
+        for i, r in enumerate(results):
+            pdf.multi_cell(0, 10, txt=f"Q{i+1}: {r['question']}")
+            pdf.multi_cell(0, 10, txt=f"Your answer: {r['user_answer']}")
+            pdf.multi_cell(0, 10, txt=f"Correct answer: {r['answer']}")
+            if r["type"] == "mc":
+                for opt, exp in r["explanations"].items():
+                    pdf.multi_cell(0, 10, txt=f"- {opt}: {exp}")
+            else:
+                pdf.multi_cell(0, 10, txt=f"Explanation: {r['explanation']}")
+            pdf.ln(5)
+        pdf.output("quiz_results.pdf")
+
     generate_pdf(results, score, len(st.session_state.questions), difficulty, name or "Anonymous")
     with open("quiz_results.pdf", "rb") as f:
         st.download_button("📄 Download PDF Results", f, file_name="quiz_results.pdf")
@@ -196,11 +269,8 @@ if "questions" in st.session_state and not st.session_state.submitted and st.ses
 # -----------------------------
 # 🔄 Restart Button
 # -----------------------------
-if st.session_state.get("submitted"):
+if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
-
-
-
 
