@@ -7,7 +7,7 @@ from datetime import datetime
 from fpdf import FPDF
 
 # -----------------------------
-# Protocol Data
+# Protocol Table (Question Source)
 # -----------------------------
 protocols = [
     {"name": "TCP", "acronym": "Transmission Control Protocol", "port": "Varies", "layer": "Transport", "reliable": True, "description": "Ensures reliable delivery of data."},
@@ -23,18 +23,39 @@ protocols = [
 ]
 
 # -----------------------------
-# Question Generator
+# Leaderboard Functions
+# -----------------------------
+def load_leaderboard():
+    if os.path.exists("leaderboard.json"):
+        with open("leaderboard.json", "r") as f:
+            return json.load(f)
+    return []
+
+def save_leaderboard(data):
+    with open("leaderboard.json", "w") as f:
+        json.dump(data, f, indent=2)
+
+def update_leaderboard(name, score, time_taken):
+    board = load_leaderboard()
+    board.append({"name": name, "score": score, "time": round(time_taken, 2)})
+    board.sort(key=lambda x: (-x["score"], x["time"]))
+    save_leaderboard(board)
+    return board
+
+# -----------------------------
+# Question Generator (based on rows)
 # -----------------------------
 def generate_questions(difficulty, num_questions):
-    used = set()
+    used_indices = set()
     questions = []
 
     while len(questions) < num_questions:
-        available = [p for p in protocols if p["name"] not in used]
-        if not available:
+        available_indices = [i for i in range(len(protocols)) if i not in used_indices]
+        if not available_indices:
             break
-        proto = random.choice(available)
-        used.add(proto["name"])
+        idx = random.choice(available_indices)
+        proto = protocols[idx]
+        used_indices.add(idx)
 
         if difficulty == "Easy":
             q_type = "mc"
@@ -90,26 +111,6 @@ def generate_questions(difficulty, num_questions):
     return questions
 
 # -----------------------------
-# Leaderboard Functions
-# -----------------------------
-def load_leaderboard():
-    if os.path.exists("leaderboard.json"):
-        with open("leaderboard.json", "r") as f:
-            return json.load(f)
-    return []
-
-def save_leaderboard(data):
-    with open("leaderboard.json", "w") as f:
-        json.dump(data, f, indent=2)
-
-def update_leaderboard(name, score, time_taken):
-    board = load_leaderboard()
-    board.append({"name": name, "score": score, "time": round(time_taken, 2)})
-    board.sort(key=lambda x: (-x["score"], x["time"]))
-    save_leaderboard(board)
-    return board
-
-# -----------------------------
 # PDF Generator
 # -----------------------------
 def generate_pdf(results, score, total, difficulty, name):
@@ -132,7 +133,7 @@ def generate_pdf(results, score, total, difficulty, name):
     pdf.output("quiz_results.pdf")
 
 # -----------------------------
-# Streamlit UI
+# Streamlit UI: Timed Question Flow
 # -----------------------------
 st.title("🧠 TCP/UDP Protocol Quiz")
 
@@ -145,7 +146,7 @@ if st.button("Generate Quiz"):
     st.session_state.submitted = False
     st.session_state.start_time = time.time()
     st.session_state.current_q = 0
-    st.session_state.timer_expired = False
+    st.session_state.timer_started = False
 
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
@@ -155,42 +156,39 @@ if "questions" in st.session_state and not st.session_state.submitted:
         st.markdown(f"**{q['question']}**")
         key = f"q_{q_index}"
 
-        timer_placeholder = st.empty()
-        answer_placeholder = st.empty()
-        next_button = st.empty()
+        # Timer and input setup
+        if not st.session_state.timer_started:
+            st.session_state.timer_started = True
+            st.session_state.timer_start = time.time()
 
-        start = time.time()
-        answered = False
+        elapsed = time.time() - st.session_state.timer_start
+        remaining = max(0, 10 - int(elapsed))
+        st.markdown(f"⏳ Time left: {remaining} seconds")
 
-        for sec in range(10, 0, -1):
-            timer_placeholder.markdown(f"⏳ Time left: {sec} seconds")
-            time.sleep(1)
-            if f"{key}_submitted" in st.session_state:
-                answered = True
-                break
+        # Show input field
+        if q["type"] == "mc":
+            answer = st.radio("Choose one:", q["options"], key=key)
+        elif q["type"] == "tf":
+            answer = st.radio("True or False:", ["True", "False"], key=key)
+        else:
+            answer = st.text_input("Your answer:", key=key)
 
-        timer_placeholder.empty()
-
-        if not answered:
+        # Handle timeout or next
+        if remaining == 0 and f"{key}_submitted" not in st.session_state:
             st.session_state.answers[key] = "No answer"
             st.session_state[f"{key}_submitted"] = True
             st.warning("⏱️ Time's up! Moving to next question.")
             time.sleep(1)
-
-        if not f"{key}_submitted" in st.session_state:
-            if q["type"] == "mc":
-                st.session_state.answers[key] = answer_placeholder.radio("Choose one:", q["options"], key=key)
-            elif q["type"] == "tf":
-                st.session_state.answers[key] = answer_placeholder.radio("True or False:", ["True", "False"], key=key)
-            else:
-                st.session_state.answers[key] = answer_placeholder.text_input("Your answer:", key=key)
-
-            if next_button.button("Next"):
-                st.session_state[f"{key}_submitted"] = True
-                st.session_state.current_q += 1
-                st.experimental_rerun()
-        else:
             st.session_state.current_q += 1
+            st.session_state.timer_started = False
+            st.experimental_rerun()
+
+        if st.button("Next"):
+            if f"{key}_submitted" not in st.session_state:
+                st.session_state.answers[key] = answer if answer else "No answer"
+                st.session_state[f"{key}_submitted"] = True
+            st.session_state.current_q += 1
+            st.session_state.timer_started = False
             st.experimental_rerun()
 
     elif q_index >= len(st.session_state.questions):
