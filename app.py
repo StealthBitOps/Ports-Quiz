@@ -95,49 +95,53 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         st.rerun()
 
 # ┌───────────────────────────────────────────────┐
-# │ SECTION 5: Review Logic (Full Detail)         │
+# │ SECTION 5: Review Logic (Safe + Detailed)     │
 # └───────────────────────────────────────────────┘
 
-st.markdown("## 🔍 Quiz Review")
+if "questions" in st.session_state and st.session_state.get("quiz_complete"):
+    st.markdown("## 🔍 Quiz Review")
 
-correct_count = 0
-for i, q in enumerate(st.session_state.questions):
-    key = f"q_{i}"
-    user_answer = st.session_state.answers.get(key, "No answer")
-    correct_answer = q["answer"]
-    is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
+    correct_count = 0
+    layer_map = {
+        1: "Physical",
+        2: "Data Link",
+        3: "Network",
+        4: "Transport",
+        5: "Session",
+        6: "Presentation",
+        7: "Application"
+    }
 
-    st.markdown(f"### Question {i+1}")
-    st.markdown(f"**Question:** {q['question']}")
-    st.markdown(f"**Your Answer:** `{user_answer}`")
-    st.markdown(f"**Correct Answer:** `{correct_answer}`")
-    st.markdown(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect'}")
-    st.markdown(f"**Explanation:** {q['explanation']}")
-    
-    # Extra details if available
-    if "port" in q:
-        st.markdown(f"**Port(s):** {q['port']}")
-    if "description" in q:
-        st.markdown(f"**Protocol Description:** {q['description']}")
-    if "osi_layer" in q:
-        layer_map = {
-            1: "Physical",
-            2: "Data Link",
-            3: "Network",
-            4: "Transport",
-            5: "Session",
-            6: "Presentation",
-            7: "Application"
-        }
-        layer_name = layer_map.get(q["osi_layer"], "Unknown")
-        st.markdown(f"**OSI Layer:** {layer_name} (Layer {q['osi_layer']})")
-    if "type" in q:
-        st.markdown(f"**Question Type:** {q['type'].upper()}")
+    for i, q in enumerate(st.session_state.questions):
+        key = f"q_{i}"
+        user_answer = st.session_state.answers.get(key, "No answer")
+        correct_answer = q["answer"]
+        is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
 
-    st.markdown("---")
+        st.markdown(f"### Question {i+1}")
+        st.markdown(f"**Question:** {q['question']}")
+        st.markdown(f"**Your Answer:** `{user_answer}`")
+        st.markdown(f"**Correct Answer:** `{correct_answer}`")
+        st.markdown(f"**Result:** {'✅ Correct' if is_correct else '❌ Incorrect'}")
+        st.markdown(f"**Explanation:** {q['explanation']}")
 
-    if is_correct:
-        correct_count += 1
+        # Extra details
+        if "port" in q:
+            st.markdown(f"**Port(s):** {q['port']}")
+        if "description" in q:
+            st.markdown(f"**Protocol Description:** {q['description']}")
+        if "osi_layer" in q:
+            layer_name = layer_map.get(q["osi_layer"], "Unknown")
+            st.markdown(f"**OSI Layer:** {layer_name} (Layer {q['osi_layer']})")
+        if "type" in q:
+            st.markdown(f"**Question Type:** {q['type'].upper()}")
 
-st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
+        st.markdown("---")
 
+        if is_correct:
+            correct_count += 1
+
+    st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
+
+else:
+    st.info("No completed quiz to review yet.")
