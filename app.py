@@ -1,11 +1,15 @@
-# ┌───────────────────────────────────────────────┐
-# │ SECTION 1: Imports and Protocol Dataset       │
-# └───────────────────────────────────────────────┘
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 1: Imports and Protocol Dataset                    │
+# │ Purpose: Load libraries and define quiz data               │
+# └────────────────────────────────────────────────────────────┘
 
 import streamlit as st
 import random
 import time
+from io import BytesIO
+from fpdf import FPDF
 
+# Protocol dataset
 protocols = [
     {"name": "SSH", "acronym": "SSH", "port": "22", "description": "Secure remote login", "osi_layer": 7, "difficulty": "Easy"},
     {"name": "DNS", "acronym": "DNS", "port": "53", "description": "Resolves domain names", "osi_layer": 7, "difficulty": "Easy"},
@@ -15,9 +19,10 @@ protocols = [
     {"name": "ICMP", "acronym": "ICMP", "port": "0-255", "description": "Troubleshoots network issues", "osi_layer": 3, "difficulty": "Hard"},
 ]
 
-# ┌───────────────────────────────────────────────┐
-# │ SECTION 2: Question Generator                 │
-# └───────────────────────────────────────────────┘
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 2: Question Generator                              │
+# │ Purpose: Create randomized questions based on difficulty   │
+# └────────────────────────────────────────────────────────────┘
 
 def generate_questions(data, difficulty, count):
     pool = [p for p in data if p["difficulty"] == difficulty]
@@ -66,11 +71,12 @@ def generate_questions(data, difficulty, count):
 
     return questions
 
-# ┌───────────────────────────────────────────────┐
-# │ SECTION 3: Welcome Screen and Quiz Setup      │
-# └───────────────────────────────────────────────┘
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 3: Welcome Screen and Quiz Setup                   │
+# │ Purpose: Configure quiz settings and initialize state      │
+# └────────────────────────────────────────────────────────────┘
 
-if "questions" not in st.session_state or st.session_state.quiz_complete:
+if "questions" not in st.session_state or st.session_state.get("quiz_complete"):
     st.title("🧠 Network Protocol Quiz")
     st.markdown("Test your knowledge of ports, protocols, and OSI layers!")
 
@@ -88,39 +94,24 @@ if "questions" not in st.session_state or st.session_state.quiz_complete:
         st.rerun()
 
 # ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 4: Quiz Flow with Timer and Conditional Buttons     │
+# │ SECTION 4: Quiz Flow with Timer                            │
+# │ Purpose: Show question, countdown timer, and handle input  │
 # └────────────────────────────────────────────────────────────┘
-
-import streamlit.components.v1 as components
 
 if "questions" in st.session_state and not st.session_state.quiz_complete:
     q_index = st.session_state.current_question
     question = st.session_state.questions[q_index]
     key = f"q_{q_index}"
 
-    # Initialize timer state
     if f"timer_{key}" not in st.session_state:
         st.session_state[f"timer_{key}"] = 10
         st.session_state[f"submitted_{key}"] = False
-        st.session_state[f"answer_{key}"] = None
         st.session_state[f"timeout_{key}"] = False
+        st.session_state[f"answer_{key}"] = ""
 
-    # Countdown logic
-    if st.session_state[f"timer_{key}"] > 0 and not st.session_state[f"submitted_{key}"]:
-        st.markdown(f"⏳ Time remaining: `{st.session_state[f'timer_{key}']}` seconds")
-        time.sleep(1)
-        st.session_state[f"timer_{key}"] -= 1
-        st.rerun()
-
-    # Timer expired
-    if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"submitted_{key}"]:
-        st.session_state[f"timeout_{key}"] = True
-        st.session_state.answers[key] = st.session_state[f"answer_{key}"] or ""
-        st.markdown("⏱️ Time's up! Answer saved.")
-        st.markdown("Click **Next** to continue.")
-
-    # Display question
     st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
+    st.markdown(f"⏳ Time remaining: `{st.session_state[f'timer_{key}']}` seconds")
+
     if question["type"] == "mc":
         selected = st.radio(question["question"], question["options"], key=f"input_{key}")
     elif question["type"] == "tf":
@@ -128,10 +119,18 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
     else:
         selected = st.text_input(question["question"], key=f"input_{key}")
 
-    # Save selected answer
     st.session_state[f"answer_{key}"] = selected
 
-    # Show Submit button only if answer is selected and timer is active
+    if st.session_state[f"timer_{key}"] > 0 and not st.session_state[f"submitted_{key}"]:
+        time.sleep(1)
+        st.session_state[f"timer_{key}"] -= 1
+        st.rerun()
+
+    if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"submitted_{key}"]:
+        st.session_state.answers[key] = selected or ""
+        st.session_state[f"timeout_{key}"] = True
+        st.markdown("⏱️ Time's up! Answer saved. Click **Next** to continue.")
+
     if selected and not st.session_state[f"timeout_{key}"] and not st.session_state[f"submitted_{key}"]:
         if st.button("Submit"):
             st.session_state.answers[key] = selected
@@ -141,7 +140,6 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
                 st.session_state.quiz_complete = True
             st.rerun()
 
-    # Show Next button only after timeout
     if st.session_state[f"timeout_{key}"]:
         if st.button("Next"):
             st.session_state.current_question += 1
@@ -186,51 +184,92 @@ if "questions" in st.session_state and st.session_state.get("quiz_complete"):
             correct_count += 1
 
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
+    st.session_state.correct_count = correct_count  # Save for later use
 
 # ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 6: Leaderboard Tracking                            │
+# │ SECTION 6: PDF Export                                      │
+# │ Purpose: Export full review as a downloadable PDF          │
 # └────────────────────────────────────────────────────────────┘
 
-if "leaderboard" not in st.session_state:
-    st.session_state.leaderboard = []
-if "attempt_count" not in st.session_state:
-    st.session_state.attempt_count = 0
+if st.session_state.get("quiz_complete"):
+    st.markdown("## 📄 Export Your Review")
+    st.markdown("Click the button below to download a PDF summary of your quiz results.")
 
-# Safely calculate elapsed time
-start_time = st.session_state.get("start_time", time.time())
-elapsed = round(time.time() - start_time, 2)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Network Protocol Quiz Review", ln=True, align="C")
+    pdf.ln(10)
 
-# Safely get difficulty and score
-difficulty = st.session_state.get("difficulty", "Easy")
-difficulty_weights = {"Easy": 1, "Medium": 2, "Hard": 3}
-score = round((correct_count * difficulty_weights.get(difficulty, 1)) / max(elapsed, 1), 4)
+    layer_map = {
+        1: "Physical", 2: "Data Link", 3: "Network",
+        4: "Transport", 5: "Session", 6: "Presentation", 7: "Application"
+    }
 
-# Save attempt
-st.session_state.attempt_count += 1
-attempt_name = f"Attempt {st.session_state.attempt_count}"
-total_questions = len(st.session_state.questions) if "questions" in st.session_state else 0
+    for i, q in enumerate(st.session_state.questions):
+        key = f"q_{i}"
+        user_answer = st.session_state.answers.get(key, "")
+        correct_answer = q["answer"]
+        is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
+        result = "Correct" if is_correct else "Incorrect"
 
-st.session_state.leaderboard.append({
-    "name": attempt_name,
-    "difficulty": difficulty,
-    "correct": correct_count,
-    "total": total_questions,
-    "time": elapsed,
-    "score": score
-})
+        pdf.multi_cell(0, 10, txt=f"Q{i+1}: {q['question']}")
+        pdf.multi_cell(0, 10, txt=f"Your Answer: {user_answer}")
+        pdf.multi_cell(0, 10, txt=f"Correct Answer: {correct_answer}")
+        pdf.multi_cell(0, 10, txt=f"Result: {result}")
+        pdf.multi_cell(0, 10, txt=f"Explanation: {q['explanation']}")
+        pdf.multi_cell(0, 10, txt=f"Port(s): {q['port']}")
+        pdf.multi_cell(0, 10, txt=f"Protocol Description: {q['description']}")
+        pdf.multi_cell(0, 10, txt=f"OSI Layer: {layer_map.get(q['osi_layer'], 'Unknown')} (Layer {q['osi_layer']})")
+        pdf.multi_cell(0, 10, txt=f"Question Type: {q['type'].upper()}")
+        pdf.ln(5)
 
-# Keep only top 10 attempts
-st.session_state.leaderboard = sorted(
-    st.session_state.leaderboard,
-    key=lambda x: x["score"],
-    reverse=True
-)[:10]
+    pdf.ln(10)
+    pdf.cell(0, 10, txt=f"Final Score: {st.session_state.correct_count} / {len(st.session_state.questions)}", ln=True)
 
-# Display leaderboard
-st.markdown("## 🏆 Leaderboard (Top 10 Attempts)")
-for entry in st.session_state.leaderboard:
-    st.markdown(
-        f"- **{entry['name']}** | Difficulty: {entry['difficulty']} | "
-        f"Score: `{entry['score']}` | Correct: {entry['correct']}/{entry['total']} | "
-        f"Time: {entry['time']}s"
-    )
+    buffer = BytesIO()
+    pdf.output(buffer)
+    st.download_button("📥 Download PDF", data=buffer.getvalue(), file_name="quiz_review.pdf")
+
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 7: Leaderboard                                     │
+# │ Purpose: Show top 10 attempts after review and PDF export  │
+# └────────────────────────────────────────────────────────────┘
+
+if st.session_state.get("quiz_complete"):
+    if "leaderboard" not in st.session_state:
+        st.session_state.leaderboard = []
+    if "attempt_count" not in st.session_state:
+        st.session_state.attempt_count = 0
+
+    elapsed = round(time.time() - st.session_state.get("start_time", time.time()), 2)
+    difficulty = st.session_state.get("difficulty", "Easy")
+    difficulty_weights = {"Easy": 1, "Medium": 2, "Hard": 3}
+    score = round((st.session_state.correct_count * difficulty_weights.get(difficulty, 1)) / max(elapsed, 1), 4)
+
+    st.session_state.attempt_count += 1
+    attempt_name = f"Attempt {st.session_state.attempt_count}"
+    total_questions = len(st.session_state.questions)
+
+    st.session_state.leaderboard.append({
+        "name": attempt_name,
+        "difficulty": difficulty,
+        "correct": st.session_state.correct_count,
+        "total": total_questions,
+        "time": elapsed,
+        "score": score
+    })
+
+    st.session_state.leaderboard = sorted(
+        st.session_state.leaderboard,
+        key=lambda x: x["score"],
+        reverse=True
+    )[:10]
+
+    st.markdown("## 🏆 Leaderboard (Top 10 Attempts)")
+    for entry in st.session_state.leaderboard:
+        st.markdown(
+            f"- **{entry['name']}** | Difficulty: {entry['difficulty']} | "
+            f"Score: `{entry['score']}` | Correct: {entry['correct']}/{entry['total']} | "
+            f"Time: {entry['time']}s"
+        )
