@@ -57,6 +57,85 @@ def save_leaderboard(df):
     return df_sorted
 
 # ┌───────────────────────────────────────────────┐
+# │ SECTION 3: Question Generator                 │
+# └───────────────────────────────────────────────┘
+
+def generate_questions(difficulty, num_questions):
+    used_indices = set()
+    questions = []
+
+    while len(questions) < num_questions:
+        available_indices = [i for i in range(len(protocols)) if i not in used_indices]
+        if not available_indices:
+            break
+
+        idx = random.choice(available_indices)
+        proto = protocols[idx]
+        used_indices.add(idx)
+
+        q_type = "mc" if difficulty == "Easy" else random.choice(["mc", "fill", "tf", "layer", "acronym"])
+
+        if q_type == "mc":
+            wrongs_pool = [p for p in protocols if p["name"] != proto["name"]]
+            wrongs = random.sample(wrongs_pool, min(3, len(wrongs_pool)))
+            options = [proto] + wrongs
+            random.shuffle(options)
+            questions.append({
+                "type": "mc",
+                "question": f"Which protocol matches this description: '{proto['description']}'?",
+                "options": [p["name"] for p in options],
+                "answer": proto["name"],
+                "explanation": {
+                    "correct": f"{proto['name']} is correct because it {proto['description'].lower()}.",
+                    "wrong": {p["name"]: f"{p['name']} is incorrect because it {p['description'].lower()}." for p in options if p["name"] != proto["name"]}
+                }
+            })
+
+        elif q_type == "fill":
+            questions.append({
+                "type": "fill",
+                "question": f"Which protocol uses port {proto['port']}?",
+                "answer": proto["name"],
+                "explanation": {
+                    "correct": f"{proto['name']} uses port {proto['port']} for {proto['description'].lower()}."
+                }
+            })
+
+        elif q_type == "layer":
+            questions.append({
+                "type": "fill",
+                "question": f"Which layer does {proto['name']} operate on?",
+                "answer": proto["layer"],
+                "explanation": {
+                    "correct": f"{proto['name']} operates on the {proto['layer']} layer."
+                }
+            })
+
+        elif q_type == "acronym":
+            questions.append({
+                "type": "fill",
+                "question": f"What does the acronym {proto['name']} stand for?",
+                "answer": proto["acronym"],
+                "explanation": {
+                    "correct": f"{proto['name']} stands for {proto['acronym']}."
+                }
+            })
+
+        elif q_type == "tf":
+            correct = "True" if proto["reliable"] else "False"
+            questions.append({
+                "type": "tf",
+                "question": f"True or False: {proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}.",
+                "options": ["True", "False"],
+                "answer": correct,
+                "explanation": {
+                    "correct": f"{proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'} because it {'uses' if proto['reliable'] else 'does not use'} connection-oriented delivery."
+                }
+            })
+
+    return questions
+
+# ┌───────────────────────────────────────────────┐
 # │ SECTION 4: Quiz Initialization and State      │
 # └───────────────────────────────────────────────┘
 
@@ -74,6 +153,68 @@ if "questions" not in st.session_state:
         st.session_state.total_time = 0
         st.session_state.quiz_complete = False
         st.session_state.start_time = time.time()
+        st.experimental_rerun()
+
+# ┌───────────────────────────────────────────────┐
+# │ SECTION 5: Quiz Flow and Timer Logic          │
+# └───────────────────────────────────────────────┘
+
+if "questions" in st.session_state and not st.session_state.quiz_complete:
+    q_index = st.session_state.current_q
+    questions = st.session_state.questions
+
+    if q_index < len(questions):
+        q = questions[q_index]
+        key = f"q_{q_index}"
+        start_key = f"{key}_start"
+        submit_key = f"{key}_submitted"
+
+        if start_key not in st.session_state:
+            st.session_state[start_key] = time.time()
+
+        elapsed = time.time() - st.session_state[start_key]
+        remaining = max(0, 10 - int(elapsed))
+
+        if submit_key not in st.session_state and remaining > 0:
+            st.markdown(f"⏳ Time remaining: {remaining} seconds")
+            st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
+
+        st.markdown(f"### Question {q_index + 1} of {len(questions)}")
+        st.markdown(f"**{q['question']}**")
+
+        answer = None
+        submitted = False
+
+        if q["type"] in ["mc", "tf"]:
+            options = q["options"]
+            selected = st.radio("Choose one:", options, key=f"radio_{q_index}")
+            answer = selected
+            if remaining > 0 and st.button("Submit"):
+                submitted = True
+
+        elif q["type"] == "fill":
+            user_input = st.text_input("Your answer:", key=f"input_{q_index}")
+            answer = user_input
+            if remaining > 0 and st.button("Submit"):
+                submitted = True
+
+        if submitted and submit_key not in st.session_state:
+            st.session_state.answers[key] = answer if answer else "No answer"
+            st.session_state.total_time += int(elapsed)
+            st.session_state[submit_key] = True
+            st.session_state.current_q += 1
+            st.experimental_rerun()
+
+        if remaining == 0 and submit_key not in st.session_state:
+            st.session_state.answers[key] = "No answer"
+            st.session_state.total_time += 10
+            if st.button("Next"):
+                st.session_state[submit_key] = True
+                st.session_state.current_q += 1
+                st.experimental_rerun()
+
+    else:
+        st.session_state.quiz_complete = True
         st.experimental_rerun()
 
 # ┌───────────────────────────────────────────────┐
@@ -116,4 +257,5 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
 
     st.session_state.final_score = correct_count
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
+
 
