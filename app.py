@@ -1,7 +1,10 @@
 import streamlit as st
-from fpdf import FPDF
-from datetime import datetime
 import random
+import time
+import json
+from datetime import datetime
+from fpdf import FPDF
+import os
 
 # -----------------------------
 # Protocol Data
@@ -87,13 +90,33 @@ def generate_questions(difficulty, num_questions):
     return questions
 
 # -----------------------------
+# Leaderboard Functions
+# -----------------------------
+def load_leaderboard():
+    if os.path.exists("leaderboard.json"):
+        with open("leaderboard.json", "r") as f:
+            return json.load(f)
+    return []
+
+def save_leaderboard(data):
+    with open("leaderboard.json", "w") as f:
+        json.dump(data, f, indent=2)
+
+def update_leaderboard(name, score, time_taken):
+    board = load_leaderboard()
+    board.append({"name": name, "score": score, "time": round(time_taken, 2)})
+    board.sort(key=lambda x: (-x["score"], x["time"]))
+    save_leaderboard(board)
+    return board
+
+# -----------------------------
 # PDF Generator
 # -----------------------------
-def generate_pdf(results, score, total, difficulty):
+def generate_pdf(results, score, total, difficulty, name):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=11)
-    pdf.cell(200, 10, txt="Quiz Results", ln=True, align="C")
+    pdf.cell(200, 10, txt=f"{name}'s Quiz Results", ln=True, align="C")
     pdf.cell(200, 10, txt=f"Score: {score}/{total} | Difficulty: {difficulty} | {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align="C")
     pdf.ln(10)
     for i, r in enumerate(results):
@@ -113,19 +136,26 @@ def generate_pdf(results, score, total, difficulty):
 # -----------------------------
 st.title("🧠 TCP/UDP Protocol Quiz")
 
-difficulty = st.selectbox("Choose difficulty", ["Easy", "Medium", "Hard"])
+name = st.text_input("Enter your name to begin:")
+difficulty = st.select_slider("Select difficulty", options=["Easy", "Medium", "Hard"], value="Medium")
 num_questions = st.slider("Number of questions", 3, len(protocols), 5)
 
-if st.button("Generate Quiz"):
+if st.button("Generate Quiz") and name:
     st.session_state.questions = generate_questions(difficulty, num_questions)
     st.session_state.answers = {}
     st.session_state.submitted = False
+    st.session_state.start_time = time.time()
 
 if "questions" in st.session_state and not st.session_state.submitted:
     st.subheader("Answer the questions:")
     for i, q in enumerate(st.session_state.questions):
         st.markdown(f"**Q{i+1}: {q['question']}**")
         key = f"q_{i}"
+        placeholder = st.empty()
+        for sec in range(10, 0, -1):
+            placeholder.markdown(f"⏳ Time left: {sec} seconds")
+            time.sleep(1)
+        placeholder.empty()
         if q["type"] == "mc":
             st.session_state.answers[key] = st.radio("Choose one:", q["options"], key=key)
         elif q["type"] == "tf":
@@ -136,6 +166,9 @@ if "questions" in st.session_state and not st.session_state.submitted:
     if st.button("Submit Quiz"):
         score = 0
         results = []
+        end_time = time.time()
+        total_time = end_time - st.session_state.start_time
+
         for i, q in enumerate(st.session_state.questions):
             user_answer = st.session_state.answers.get(f"q_{i}", "")
             correct = user_answer.strip().lower() == q["answer"].strip().lower()
@@ -154,7 +187,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
             results.append(result)
 
         st.session_state.submitted = True
-        st.success(f"✅ You scored {score} out of {len(st.session_state.questions)}")
+        st.success(f"✅ {name}, you scored {score} out of {len(st.session_state.questions)} in {round(total_time, 2)} seconds")
 
         for r in results:
             st.markdown(f"**Q:** {r['question']}")
@@ -168,11 +201,15 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.markdown(f"- Explanation: {r['explanation']}")
             st.markdown("---")
 
-        generate_pdf(results, score, len(st.session_state.questions), difficulty)
+        generate_pdf(results, score, len(st.session_state.questions), difficulty, name)
         with open("quiz_results.pdf", "rb") as f:
             st.download_button("📄 Download PDF Results", f, file_name="quiz_results.pdf")
+
+        leaderboard = update_leaderboard(name, score, total_time)
+        st.subheader("🏆 Leaderboard")
+        for i, entry in enumerate(leaderboard[:10], start=1):
+            st.markdown(f"{i}. **{entry['name']}** — {entry['score']} pts in {entry['time']}s")
 
 if st.button("Start Over"):
     st.session_state.clear()
     st.experimental_rerun()
-
