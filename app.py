@@ -126,27 +126,26 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         st.rerun()
 
     # Timeout reached
-    if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"submitted_{key}"]:
+    if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"timeout_{key}"]:
         st.session_state.answers[key] = selected or ""
         st.session_state[f"timeout_{key}"] = True
-        st.markdown("⏱️ Time's up! Answer saved. Click **Next** to continue.")
 
-    # Submit button (always visible, disabled until answer is selected and timer is active)
+    # Submit button (always visible)
     submit_disabled = (
         not selected or
         st.session_state[f"timeout_{key}"] or
         st.session_state[f"submitted_{key}"]
     )
-    st.button("Submit", disabled=submit_disabled, key=f"submit_{key}", on_click=lambda: (
-        st.session_state.answers.update({key: selected}),
-        st.session_state.update({f"submitted_{key}": True}),
-        st.session_state.update({"current_question": st.session_state.current_question + 1}),
-        st.session_state.update({"quiz_complete": st.session_state.current_question + 1 >= st.session_state.num_questions}),
+    if st.button("Submit", disabled=submit_disabled, key=f"submit_{key}"):
+        st.session_state.answers[key] = selected
+        st.session_state[f"submitted_{key}"] = True
+        st.session_state.current_question += 1
+        if st.session_state.current_question >= st.session_state.num_questions:
+            st.session_state.quiz_complete = True
         st.rerun()
-    ))
 
     # Next button (only after timeout)
-    if st.session_state[f"timeout_{key}"]:
+    if st.session_state[f"timeout_{key}"] and not st.session_state[f"submitted_{key}"]:
         if st.button("Next", key=f"next_{key}"):
             st.session_state.current_question += 1
             if st.session_state.current_question >= st.session_state.num_questions:
@@ -292,6 +291,7 @@ if st.session_state.get("quiz_complete"):
         st.session_state.pop("correct_count", None)
         st.session_state.pop("start_time", None)
         st.rerun()
+
 
 
 
