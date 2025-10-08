@@ -1,2 +1,5 @@
 streamlit
+
 fpdf
+
+streamlit-autorefresh
