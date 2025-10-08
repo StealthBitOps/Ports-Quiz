@@ -219,19 +219,29 @@ if "questions" in st.session_state and not st.session_state.submitted:
                     st.experimental_rerun()
 
 # ============================================================
-# 🏁 SECTION 4: Quiz Completion
+# 🏁 SECTION 4: Quiz Completion Screen
 # ============================================================
 
 if "questions" in st.session_state and not st.session_state.submitted:
     if st.session_state.current_q >= len(st.session_state.questions):
-        st.session_state.submitted = True
-        st.markdown("🎉 Quiz complete! Here are your answers:")
+        st.markdown("✅ Quiz complete!")
+        st.markdown("Click below to review your answers.")
+        if st.button("Review Answers"):
+            st.session_state.submitted = True
+            st.experimental_rerun()
 
-        for i, q in enumerate(st.session_state.questions):
-            key = f"q_{i}"
-            user_answer = st.session_state.answers.get(key, "No answer")
-            correct_answer = q["answer"]
-            st.markdown(f"**Q{i+1}: {q['question']}**")
-            st.markdown(f"- Your answer: `{user_answer}`")
-            st.markdown(f"- Correct answer: `{correct_answer}`")
-            st.markdown("---")
+# ============================================================
+# 📋 SECTION 5: Review Answers
+# ============================================================
+
+if "questions" in st.session_state and st.session_state.submitted:
+    st.markdown("🎉 Here are your answers:")
+
+    for i, q in enumerate(st.session_state.questions):
+        key = f"q_{i}"
+        user_answer = st.session_state.answers.get(key, "No answer")
+        correct_answer = q["answer"]
+        st.markdown(f"**Q{i+1}: {q['question']}**")
+        st.markdown(f"- Your answer: `{user_answer}`")
+        st.markdown(f"- Correct answer: `{correct_answer}`")
+        st.markdown("---")
