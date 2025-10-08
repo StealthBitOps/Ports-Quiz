@@ -19,51 +19,54 @@ protocols = [
 # -----------------------------
 # Utility Functions
 # -----------------------------
-def generate_questions(difficulty, num_questions):
-    pool_size = int(len(protocols) * difficulty)
-    pool = random.sample(protocols, pool_size)
+def generate_questions(num_questions):
     questions = []
     for i in range(num_questions):
-        proto = random.choice(pool)
-        q_type = random.choice(["mc", "tf", "fill"])
+        q_type = random.choices(["mc", "fill", "tf"], weights=[0.4, 0.3, 0.3])[0]
         if q_type == "mc":
+            proto = random.choice(protocols)
             options = random.sample([p["name"] for p in protocols if p["name"] != proto["name"]], 3)
             options.append(proto["name"])
             random.shuffle(options)
             questions.append({
                 "type": "mc",
+                "difficulty": "Easy",
                 "question": f"Which protocol matches this description: '{proto['description']}'?",
                 "options": options,
                 "answer": proto["name"],
                 "explanation": f"The correct protocol is {proto['name']} because: {proto['description']}"
             })
-        elif q_type == "tf":
-            statement = f"{proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}."
-            correct = "True" if proto['reliable'] else "False"
-            questions.append({
-                "type": "tf",
-                "question": f"True or False: {statement}",
-                "answer": correct,
-                "explanation": f"{proto['name']} is {'reliable' if proto['reliable'] else 'not reliable'}."
-            })
-        else:
+        elif q_type == "fill":
+            proto = random.choice(protocols)
             questions.append({
                 "type": "fill",
+                "difficulty": "Medium",
                 "question": f"Which protocol uses port {proto['port']}?",
                 "answer": proto["name"],
                 "explanation": f"{proto['name']} uses port {proto['port']}."
             })
+        else:
+            proto = random.choice([p for p in protocols if p["name"] in ["TCP", "UDP"]])
+            statement = f"{proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}."
+            correct = "True" if proto['reliable'] else "False"
+            questions.append({
+                "type": "tf",
+                "difficulty": "Hard",
+                "question": f"True or False: {statement}",
+                "answer": correct,
+                "explanation": f"{proto['name']} is {'reliable' if proto['reliable'] else 'not reliable'}."
+            })
     return questions
 
-def generate_pdf(results, score, total, difficulty):
+def generate_pdf(results, score, total):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=11)
     pdf.cell(200, 10, txt="Quiz Results", ln=True, align="C")
-    pdf.cell(200, 10, txt=f"Score: {score}/{total} | Difficulty: {difficulty} | {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align="C")
+    pdf.cell(200, 10, txt=f"Score: {score}/{total} | {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align="C")
     pdf.ln(10)
     for i, r in enumerate(results):
-        pdf.multi_cell(0, 10, txt=f"Q{i+1}: {r['question']}")
+        pdf.multi_cell(0, 10, txt=f"Q{i+1} ({r['difficulty']}): {r['question']}")
         pdf.multi_cell(0, 10, txt=f"Your answer: {r['user_answer']}")
         pdf.multi_cell(0, 10, txt=f"Correct answer: {r['answer']}")
         pdf.multi_cell(0, 10, txt=f"Explanation: {r['explanation']}")
@@ -75,11 +78,10 @@ def generate_pdf(results, score, total, difficulty):
 # -----------------------------
 st.title("🧠 TCP/UDP Protocol Quiz")
 
-difficulty = st.slider("Select difficulty", 0.25, 1.0, 0.5)
 num_questions = st.slider("Number of questions", 3, 10, 5)
 
 if "questions" not in st.session_state:
-    st.session_state.questions = generate_questions(difficulty, num_questions)
+    st.session_state.questions = generate_questions(num_questions)
     st.session_state.answers = {}
 
 questions = st.session_state.questions
@@ -87,7 +89,7 @@ questions = st.session_state.questions
 st.subheader("Answer the questions:")
 
 for i, q in enumerate(questions):
-    st.markdown(f"**Q{i+1}: {q['question']}**")
+    st.markdown(f"**Q{i+1} ({q['difficulty']}): {q['question']}**")
     key = f"q_{i}"
     if q["type"] == "mc":
         st.session_state.answers[key] = st.radio("Choose one:", q["options"], key=key)
@@ -108,16 +110,17 @@ if st.button("Submit Quiz"):
             "question": q["question"],
             "user_answer": user_answer,
             "answer": q["answer"],
-            "explanation": q["explanation"]
+            "explanation": q["explanation"],
+            "difficulty": q["difficulty"]
         })
     st.success(f"✅ You scored {score} out of {len(questions)}")
     for r in results:
-        st.markdown(f"**Q:** {r['question']}")
+        st.markdown(f"**Q ({r['difficulty']}):** {r['question']}")
         st.markdown(f"- Your answer: `{r['user_answer']}`")
         st.markdown(f"- Correct answer: `{r['answer']}`")
         st.markdown(f"- Explanation: {r['explanation']}")
         st.markdown("---")
-    generate_pdf(results, score, len(questions), difficulty)
+    generate_pdf(results, score, len(questions))
     with open("quiz_results.pdf", "rb") as f:
         st.download_button("📄 Download PDF Results", f, file_name="quiz_results.pdf")
 
