@@ -1,4 +1,45 @@
 # ┌───────────────────────────────────────────────┐
+# │ SECTION 1: Imports, Constants, and Dataset    │
+# └───────────────────────────────────────────────┘
+
+# 📦 Imports
+import streamlit as st
+import pandas as pd
+import random
+import time
+import os
+from streamlit_autorefresh import st_autorefresh
+
+# ⚙️ Constants
+LEADERBOARD_FILE = "leaderboard.html"
+MAX_LEADERBOARD_ENTRIES = 30
+MAX_QUESTIONS = 20  # One question per protocol
+
+# 📚 Protocol Dataset (20 entries)
+protocols = [
+    {"name": "FTP", "description": "Used for reliable file transfer", "port": 21, "layer": "Application", "reliable": True, "acronym": "File Transfer Protocol"},
+    {"name": "HTTP", "description": "Used for web page delivery", "port": 80, "layer": "Application", "reliable": True, "acronym": "HyperText Transfer Protocol"},
+    {"name": "HTTPS", "description": "Secure version of HTTP", "port": 443, "layer": "Application", "reliable": True, "acronym": "HyperText Transfer Protocol Secure"},
+    {"name": "SMTP", "description": "Used for sending emails", "port": 25, "layer": "Application", "reliable": True, "acronym": "Simple Mail Transfer Protocol"},
+    {"name": "POP3", "description": "Used for retrieving emails", "port": 110, "layer": "Application", "reliable": True, "acronym": "Post Office Protocol v3"},
+    {"name": "IMAP", "description": "Used for managing emails on server", "port": 143, "layer": "Application", "reliable": True, "acronym": "Internet Message Access Protocol"},
+    {"name": "DNS", "description": "Resolves domain names to IP addresses", "port": 53, "layer": "Application", "reliable": False, "acronym": "Domain Name System"},
+    {"name": "DHCP", "description": "Assigns IP addresses to devices", "port": 67, "layer": "Application", "reliable": False, "acronym": "Dynamic Host Configuration Protocol"},
+    {"name": "SNMP", "description": "Used for network monitoring", "port": 161, "layer": "Application", "reliable": False, "acronym": "Simple Network Management Protocol"},
+    {"name": "Telnet", "description": "Remote login without encryption", "port": 23, "layer": "Application", "reliable": True, "acronym": "Telecommunication Network"},
+    {"name": "SSH", "description": "Secure remote login", "port": 22, "layer": "Application", "reliable": True, "acronym": "Secure Shell"},
+    {"name": "TCP", "description": "Reliable transport protocol", "port": None, "layer": "Transport", "reliable": True, "acronym": "Transmission Control Protocol"},
+    {"name": "UDP", "description": "Unreliable transport protocol", "port": None, "layer": "Transport", "reliable": False, "acronym": "User Datagram Protocol"},
+    {"name": "IP", "description": "Routes packets across networks", "port": None, "layer": "Network", "reliable": False, "acronym": "Internet Protocol"},
+    {"name": "ICMP", "description": "Used for error reporting and diagnostics", "port": None, "layer": "Network", "reliable": False, "acronym": "Internet Control Message Protocol"},
+    {"name": "ARP", "description": "Resolves IP to MAC addresses", "port": None, "layer": "Network", "reliable": False, "acronym": "Address Resolution Protocol"},
+    {"name": "RDP", "description": "Remote desktop access", "port": 3389, "layer": "Application", "reliable": True, "acronym": "Remote Desktop Protocol"},
+    {"name": "NTP", "description": "Synchronizes clocks over network", "port": 123, "layer": "Application", "reliable": False, "acronym": "Network Time Protocol"},
+    {"name": "LDAP", "description": "Directory access protocol", "port": 389, "layer": "Application", "reliable": True, "acronym": "Lightweight Directory Access Protocol"},
+    {"name": "TFTP", "description": "Simple file transfer without authentication", "port": 69, "layer": "Application", "reliable": False, "acronym": "Trivial File Transfer Protocol"}
+]
+
+# ┌───────────────────────────────────────────────┐
 # │ SECTION 2: Leaderboard Utilities              │
 # └───────────────────────────────────────────────┘
 
@@ -75,3 +116,4 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
 
     st.session_state.final_score = correct_count
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
+
