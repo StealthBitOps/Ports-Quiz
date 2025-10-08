@@ -180,7 +180,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
             st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
             st.session_state[f"{key}_start_time"] = None
-            st.experimental_rerun()
+            st.stop()  # ✅ Safe halt to trigger rerun
 
         # Manual Next button
         if st.button("Next"):
@@ -189,7 +189,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
             st.session_state[f"{key}_start_time"] = None
-            st.experimental_rerun()
+            st.stop()  # ✅ Safe halt to trigger rerun
 
 # ============================================================
 # ✅ SECTION 4: Submission, Feedback, Leaderboard, PDF Export
@@ -275,3 +275,4 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
