@@ -142,11 +142,12 @@ if st.button("Generate Quiz"):
     st.session_state.submitted = False
     st.session_state.current_q = 0
     st.session_state.start_time = time.time()
-
+    
 # ============================================================
 # ⏱️ SECTION 3: Quiz Flow with Timer and Answer Input
 # ============================================================
 
+# Safe rerun trigger
 if st.session_state.get("trigger_rerun"):
     st.session_state.trigger_rerun = False
     st.stop()
@@ -173,6 +174,9 @@ if "questions" in st.session_state and not st.session_state.submitted:
         st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
 
         # ✅ Input field handling
+        submitted = False
+        answer = None
+
         if q["type"] == "mc":
             answer = st.radio("Choose one:", q["options"], key=key)
         elif q["type"] == "tf":
@@ -181,22 +185,31 @@ if "questions" in st.session_state and not st.session_state.submitted:
             input_key = f"user_input_{q_index}"
             if input_key not in st.session_state:
                 st.session_state[input_key] = ""
-            st.session_state[input_key] = st.text_input("Your answer:", value=st.session_state[input_key])
+
+            # ✅ Use form to capture Enter key
+            with st.form(key=f"form_{q_index}"):
+                st.session_state[input_key] = st.text_input("Your answer:", value=st.session_state[input_key])
+                submitted = st.form_submit_button("Next")
+
             answer = st.session_state[input_key]
 
-        # ✅ Auto-submit after timeout
-        if remaining == 0 and f"{key}_submitted" not in st.session_state:
+        # ✅ Manual Next button for MC and TF
+        if q["type"] in ["mc", "tf"]:
+            if st.button("Next"):
+                submitted = True
+
+        # ✅ Handle submission
+        if submitted and f"{key}_submitted" not in st.session_state:
             st.session_state.answers[key] = answer if answer else "No answer"
             st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
             st.session_state[start_time_key] = None
             st.session_state.trigger_rerun = True
 
-        # ✅ Manual Next button
-        if st.button("Next"):
-            if f"{key}_submitted" not in st.session_state:
-                st.session_state.answers[key] = answer if answer else "No answer"
-                st.session_state[f"{key}_submitted"] = True
+        # ✅ Auto-submit after timeout
+        if remaining == 0 and f"{key}_submitted" not in st.session_state:
+            st.session_state.answers[key] = "No answer"
+            st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
             st.session_state[start_time_key] = None
             st.session_state.trigger_rerun = True
@@ -285,6 +298,7 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
 
 
