@@ -62,15 +62,15 @@ def update_leaderboard(name, score, time_taken):
 # ============================================================
 
 st.title("🧠 TCP/UDP Protocol Quiz")
-st.markdown("Welcome! Test your knowledge of network protocols. Select your difficulty and number of questions to begin.")
+st.markdown("Welcome! Select difficulty and number of questions to begin.")
 
 difficulty = st.select_slider("Select difficulty", options=["Easy", "Medium", "Hard"], value="Medium")
 num_questions = st.slider("Number of questions", min_value=3, max_value=len(protocols), value=5)
 
 if st.button("Generate Quiz"):
-    # ✅ Clear old session keys to avoid leftover data
+    # Clear previous state
     for key in list(st.session_state.keys()):
-        if key.startswith("q_") or key.startswith("user_input_") or key.endswith("_start_time") or key == "trigger_rerun":
+        if key.startswith("q_") or key.startswith("user_input_") or key.endswith("_start_time") or key.startswith("radio_"):
             del st.session_state[key]
 
     def generate_questions(difficulty, num_questions):
@@ -95,61 +95,48 @@ if st.button("Generate Quiz"):
                 options = random.sample([p["name"] for p in protocols if p["name"] != proto["name"]], 3)
                 options.append(proto["name"])
                 random.shuffle(options)
-                explanations = {opt: next((p["description"] for p in protocols if p["name"] == opt), "No info") for opt in options}
                 questions.append({
                     "type": "mc",
                     "question": f"Which protocol matches this description: '{proto['description']}'?",
                     "options": options,
-                    "answer": proto["name"],
-                    "explanations": explanations
+                    "answer": proto["name"]
                 })
             elif q_type == "fill":
                 questions.append({
                     "type": "fill",
                     "question": f"Which protocol uses port {proto['port']}?",
-                    "answer": proto["name"],
-                    "explanation": f"{proto['name']} uses port {proto['port']} for {proto['description']}."
+                    "answer": proto["name"]
                 })
             elif q_type == "layer":
                 questions.append({
                     "type": "fill",
                     "question": f"Which layer does {proto['name']} operate on?",
-                    "answer": proto["layer"],
-                    "explanation": f"{proto['name']} operates on the {proto['layer']} layer."
+                    "answer": proto["layer"]
                 })
             elif q_type == "acronym":
                 questions.append({
                     "type": "fill",
                     "question": f"What does the acronym {proto['name']} stand for?",
-                    "answer": proto["acronym"],
-                    "explanation": f"{proto['name']} stands for {proto['acronym']}."
+                    "answer": proto["acronym"]
                 })
             else:
                 correct = "True" if proto["reliable"] else "False"
-                explanation = f"{proto['name']} is {'reliable' if proto['reliable'] else 'not reliable'} because it {'ensures' if proto['reliable'] else 'does not guarantee'} delivery."
                 questions.append({
                     "type": "tf",
                     "question": f"True or False: {proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}.",
-                    "answer": correct,
-                    "explanation": explanation
+                    "answer": correct
                 })
 
         return questions
 
-    # ✅ Initialize new quiz
     st.session_state.questions = generate_questions(difficulty, num_questions)
     st.session_state.answers = {}
     st.session_state.submitted = False
     st.session_state.current_q = 0
-    st.session_state.start_time = time.time()
 
 # ============================================================
 # ⏱️ SECTION 3: Quiz Flow with Timer and Answer Input
 # ============================================================
-
-if st.session_state.get("trigger_rerun"):
-    st.session_state.trigger_rerun = False
-    st.stop()
 
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
@@ -160,42 +147,36 @@ if "questions" in st.session_state and not st.session_state.submitted:
 
         key = f"q_{q_index}"
         start_time_key = f"{key}_start_time"
+        submitted_key = f"{key}_submitted"
 
-        # ✅ Safe timer initialization
-        if start_time_key not in st.session_state or st.session_state[start_time_key] is None:
+        # ✅ Timer setup
+        if start_time_key not in st.session_state:
             st.session_state[start_time_key] = time.time()
 
-        # ✅ Timer logic
         elapsed = time.time() - st.session_state[start_time_key]
         remaining = max(0, 10 - int(elapsed))
         st.markdown(f"⏳ Time left: {remaining} seconds")
 
-        # ✅ Refresh only if timer is active
-        if remaining > 0:
+        if remaining > 0 and submitted_key not in st.session_state:
             st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
 
-        submitted = False
         answer = None
+        submitted = False
 
-        # ✅ Multiple Choice and True/False using radio buttons
+        # ✅ Multiple Choice and True/False
         if q["type"] in ["mc", "tf"]:
             options = q["options"] if q["type"] == "mc" else ["True", "False"]
             radio_key = f"radio_{q_index}"
-
-            if radio_key not in st.session_state:
-                st.session_state[radio_key] = None
-
             selected = st.radio("Choose one:", options, key=radio_key)
             answer = selected
 
-            # Enable submit only if selected
             if selected:
                 if st.button("Submit"):
                     submitted = True
             else:
                 st.button("Submit", disabled=True)
 
-        # ✅ Fill-in-the-blank with Enter key and Submit button
+        # ✅ Fill-in-the-blank
         elif q["type"] == "fill":
             input_key = f"user_input_{q_index}"
             if input_key not in st.session_state:
@@ -206,29 +187,24 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 submitted = st.form_submit_button("Submit")
 
             answer = st.session_state[input_key]
-            if not submitted and answer.strip():
-                if st.button("Submit"):
-                    submitted = True
-            elif not answer.strip():
-                st.button("Submit", disabled=True)
 
         # ✅ Handle submission
-        if submitted and f"{key}_submitted" not in st.session_state:
+        if submitted and submitted_key not in st.session_state:
             st.session_state.answers[key] = answer if answer else "No answer"
-            st.session_state[f"{key}_submitted"] = True
+            st.session_state[submitted_key] = True
             st.session_state.current_q += 1
             st.session_state[start_time_key] = None
-            st.session_state.trigger_rerun = True
+            st.experimental_rerun()
 
-        # ✅ Show Next button only after timeout
-        if remaining == 0 and f"{key}_submitted" not in st.session_state:
+        # ✅ Show Next button after timeout
+        if remaining == 0 and submitted_key not in st.session_state:
             st.markdown("⏱ Time's up! You can still submit your answer.")
             if st.button("Next"):
                 st.session_state.answers[key] = answer if answer else "No answer"
-                st.session_state[f"{key}_submitted"] = True
+                st.session_state[submitted_key] = True
                 st.session_state.current_q += 1
                 st.session_state[start_time_key] = None
-                st.session_state.trigger_rerun = True
+                st.experimental_rerun()
 
 # ============================================================
 # ✅ SECTION 4: Submission, Feedback, Leaderboard, PDF Export
@@ -314,6 +290,7 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
 
 
