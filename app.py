@@ -130,7 +130,7 @@ def generate_pdf(results, score, total, difficulty, name):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=11)
-    pdf.cell(200, 10, txt=f"{name}'s Quiz Results
+    pdf.cell(200, 10, txt=f"{name}'s Quiz Results", ln=True, align="C")
 
 # -----------------------------
 # ✅ Submission and Feedback
@@ -199,3 +199,4 @@ elif "questions" in st.session_state and not st.session_state.submitted and st.s
 if st.button("🔄 Start Over"):
     st.session_state.clear()
     st.experimental_rerun()
+
