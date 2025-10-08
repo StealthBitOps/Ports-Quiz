@@ -9,7 +9,11 @@ import json
 import os
 from datetime import datetime
 from fpdf import FPDF
+from streamlit_autorefresh import st_autorefresh  # ✅ Required for countdown
 
+# -----------------------------
+# 📊 Protocol Table (20 Rows)
+# -----------------------------
 protocols = [
     {"name": "TCP", "acronym": "Transmission Control Protocol", "port": "Varies", "layer": "Transport", "reliable": True, "description": "Ensures reliable delivery of data."},
     {"name": "UDP", "acronym": "User Datagram Protocol", "port": "Varies", "layer": "Transport", "reliable": False, "description": "Faster but does not guarantee delivery."},
@@ -33,6 +37,9 @@ protocols = [
     {"name": "BGP", "acronym": "Border Gateway Protocol", "port": "179", "layer": "Network", "reliable": True, "description": "Manages routing between autonomous systems."}
 ]
 
+# -----------------------------
+# 🏆 Leaderboard Functions
+# -----------------------------
 def load_leaderboard():
     if os.path.exists("leaderboard.json"):
         with open("leaderboard.json", "r") as f:
@@ -57,47 +64,88 @@ def update_leaderboard(name, score, time_taken):
 st.title("🧠 TCP/UDP Protocol Quiz")
 st.markdown("Welcome! Test your knowledge of network protocols. Select your difficulty and number of questions to begin.")
 
+# Difficulty and question count controls
 difficulty = st.select_slider("Select difficulty", options=["Easy", "Medium", "Hard"], value="Medium")
-num_questions = st.slider("Number of questions", 3, len(protocols), 5)
+num_questions = st.slider("Number of questions", min_value=3, max_value=len(protocols), value=5)
 
-def generate_questions(difficulty, num_questions):
-    used_indices = set()
-    questions = []
-    while len(questions) < num_questions:
-        available_indices = [i for i in range(len(protocols)) if i not in used_indices]
-        if not available_indices:
-            break
-        idx = random.choice(available_indices)
-        proto = protocols[idx]
-        used_indices.add(idx)
-        q_type = "mc" if difficulty == "Easy" else random.choice(["mc", "fill", "tf", "layer", "acronym"])
-        if q_type == "mc":
-            options = random.sample([p["name"] for p in protocols if p["name"] != proto["name"]], 3)
-            options.append(proto["name"])
-            random.shuffle(options)
-            explanations = {opt: next((p["description"] for p in protocols if p["name"] == opt), "No info") for opt in options}
-            questions.append({"type": "mc", "question": f"Which protocol matches this description: '{proto['description']}'?", "options": options, "answer": proto["name"], "explanations": explanations})
-        elif q_type == "fill":
-            questions.append({"type": "fill", "question": f"Which protocol uses port {proto['port']}?", "answer": proto["name"], "explanation": f"{proto['name']} uses port {proto['port']} for {proto['description']}."})
-        elif q_type == "layer":
-            questions.append({"type": "fill", "question": f"Which layer does {proto['name']} operate on?", "answer": proto["layer"], "explanation": f"{proto['name']} operates on the {proto['layer']} layer."})
-        elif q_type == "acronym":
-            questions.append({"type": "fill", "question": f"What does the acronym {proto['name']} stand for?", "answer": proto["acronym"], "explanation": f"{proto['name']} stands for {proto['acronym']}."})
-        else:
-            correct = "True" if proto["reliable"] else "False"
-            explanation = f"{proto['name']} is {'reliable' if proto['reliable'] else 'not reliable'} because it {'ensures' if proto['reliable'] else 'does not guarantee'} delivery."
-            questions.append({"type": "tf", "question": f"True or False: {proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}.", "answer": correct, "explanation": explanation})
-    return questions
-
+# Generate quiz button
 if st.button("Generate Quiz"):
+    def generate_questions(difficulty, num_questions):
+        used_indices = set()
+        questions = []
+        while len(questions) < num_questions:
+            available_indices = [i for i in range(len(protocols)) if i not in used_indices]
+            if not available_indices:
+                break
+            idx = random.choice(available_indices)
+            proto = protocols[idx]
+            used_indices.add(idx)
+
+            # Determine question type based on difficulty
+            if difficulty == "Easy":
+                q_type = "mc"
+            elif difficulty == "Medium":
+                q_type = random.choice(["mc", "fill"])
+            else:
+                q_type = random.choice(["fill", "tf", "layer", "acronym"])
+
+            # Build question
+            if q_type == "mc":
+                options = random.sample([p["name"] for p in protocols if p["name"] != proto["name"]], 3)
+                options.append(proto["name"])
+                random.shuffle(options)
+                explanations = {opt: next((p["description"] for p in protocols if p["name"] == opt), "No info") for opt in options}
+                questions.append({
+                    "type": "mc",
+                    "question": f"Which protocol matches this description: '{proto['description']}'?",
+                    "options": options,
+                    "answer": proto["name"],
+                    "explanations": explanations
+                })
+            elif q_type == "fill":
+                questions.append({
+                    "type": "fill",
+                    "question": f"Which protocol uses port {proto['port']}?",
+                    "answer": proto["name"],
+                    "explanation": f"{proto['name']} uses port {proto['port']} for {proto['description']}."
+                })
+            elif q_type == "layer":
+                questions.append({
+                    "type": "fill",
+                    "question": f"Which layer does {proto['name']} operate on?",
+                    "answer": proto["layer"],
+                    "explanation": f"{proto['name']} operates on the {proto['layer']} layer."
+                })
+            elif q_type == "acronym":
+                questions.append({
+                    "type": "fill",
+                    "question": f"What does the acronym {proto['name']} stand for?",
+                    "answer": proto["acronym"],
+                    "explanation": f"{proto['name']} stands for {proto['acronym']}."
+                })
+            else:
+                correct = "True" if proto["reliable"] else "False"
+                explanation = f"{proto['name']} is {'reliable' if proto['reliable'] else 'not reliable'} because it {'ensures' if proto['reliable'] else 'does not guarantee'} delivery."
+                questions.append({
+                    "type": "tf",
+                    "question": f"True or False: {proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}.",
+                    "answer": correct,
+                    "explanation": explanation
+                })
+
+        return questions
+
+    # Initialize session state
     st.session_state.questions = generate_questions(difficulty, num_questions)
     st.session_state.answers = {}
     st.session_state.submitted = False
     st.session_state.current_q = 0
+    st.session_state.start_time = time.time()
 
-# -----------------------------
-# ⏱️ Quiz Flow with Timer and Answer Input
-# -----------------------------
+# ============================================================
+# ⏱️ SECTION 3: Quiz Flow with Timer and Answer Input
+# ============================================================
+
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
     if q_index < len(st.session_state.questions):
@@ -110,11 +158,15 @@ if "questions" in st.session_state and not st.session_state.submitted:
         if f"{key}_start_time" not in st.session_state:
             st.session_state[f"{key}_start_time"] = time.time()
 
+        # Calculate remaining time
         elapsed = time.time() - st.session_state[f"{key}_start_time"]
         remaining = max(0, 10 - int(elapsed))
         st.markdown(f"⏳ Time left: {remaining} seconds")
 
-        # Show input field
+        # 🔁 Auto-refresh every second for countdown
+        st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
+
+        # Show input field based on question type
         if q["type"] == "mc":
             answer = st.radio("Choose one:", q["options"], key=key)
         elif q["type"] == "tf":
@@ -149,6 +201,7 @@ if "questions" in st.session_state and not st.session_state.submitted and st.ses
     end_time = time.time()
     total_time = end_time - st.session_state.get("start_time", end_time)
 
+    # Evaluate answers
     for i, q in enumerate(st.session_state.questions):
         user_answer = st.session_state.answers.get(f"q_{i}", "")
         correct = user_answer.strip().lower() == q["answer"].strip().lower()
@@ -169,6 +222,7 @@ if "questions" in st.session_state and not st.session_state.submitted and st.ses
     st.session_state.submitted = True
     st.success(f"✅ You scored {score} out of {len(st.session_state.questions)} in {round(total_time, 2)} seconds")
 
+    # Show detailed feedback
     for r in results:
         st.markdown(f"**Q:** {r['question']}")
         st.markdown(f"- Your answer: `{r['user_answer']}`")
@@ -216,10 +270,8 @@ if "questions" in st.session_state and not st.session_state.submitted and st.ses
     with open("quiz_results.pdf", "rb") as f:
         st.download_button("📄 Download PDF Results", f, file_name="quiz_results.pdf")
 
-# Restart button
+# 🔄 Restart button
 if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
-
-
