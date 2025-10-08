@@ -146,10 +146,10 @@ if st.button("Generate Quiz"):
 # ⏱️ SECTION 3: Quiz Flow with Timer and Answer Input
 # ============================================================
 
-# 🔁 Safe rerun trigger if timeout occurred
-if st.session_state.get("auto_advance"):
-    st.session_state.auto_advance = False
-    st.experimental_rerun()
+# 🔁 Safe rerun trigger if timeout or "Next" was clicked
+if st.session_state.get("trigger_rerun"):
+    st.session_state.trigger_rerun = False
+    st.stop()  # ✅ Safe halt to allow rerun
 
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
@@ -185,7 +185,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
             st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
             st.session_state[f"{key}_start_time"] = None
-            st.session_state.auto_advance = True  # ✅ Trigger rerun safely
+            st.session_state.trigger_rerun = True  # ✅ Set rerun flag
 
         # Manual Next button
         if st.button("Next"):
@@ -194,7 +194,7 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
             st.session_state[f"{key}_start_time"] = None
-            st.session_state.auto_advance = True  # ✅ Trigger rerun safely
+            st.session_state.trigger_rerun = True  # ✅ Set rerun flag
 
 # ============================================================
 # ✅ SECTION 4: Submission, Feedback, Leaderboard, PDF Export
@@ -280,5 +280,6 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
 
