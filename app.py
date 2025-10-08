@@ -87,34 +87,72 @@ if "questions" not in st.session_state or st.session_state.quiz_complete:
         st.session_state.quiz_complete = False
         st.rerun()
 
-# ┌───────────────────────────────────────────────┐
-# │ SECTION 4: Quiz Flow                          │
-# └───────────────────────────────────────────────┘
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 4: Quiz Flow with Timer and Conditional Buttons     │
+# └────────────────────────────────────────────────────────────┘
+
+import streamlit.components.v1 as components
 
 if "questions" in st.session_state and not st.session_state.quiz_complete:
     q_index = st.session_state.current_question
     question = st.session_state.questions[q_index]
-    st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
-    st.markdown(f"⏱️ Time elapsed: {round(time.time() - st.session_state.start_time, 2)} seconds")
-
     key = f"q_{q_index}"
-    if question["type"] == "mc":
-        answer = st.radio(question["question"], question["options"], key=key)
-    elif question["type"] == "tf":
-        answer = st.radio(question["question"], ["True", "False"], key=key)
-    else:
-        answer = st.text_input(question["question"], key=key)
 
-    if st.button("Next"):
-        st.session_state.answers[key] = answer
-        st.session_state.current_question += 1
-        if st.session_state.current_question >= st.session_state.num_questions:
-            st.session_state.quiz_complete = True
+    # Initialize timer state
+    if f"timer_{key}" not in st.session_state:
+        st.session_state[f"timer_{key}"] = 10
+        st.session_state[f"submitted_{key}"] = False
+        st.session_state[f"answer_{key}"] = None
+        st.session_state[f"timeout_{key}"] = False
+
+    # Countdown logic
+    if st.session_state[f"timer_{key}"] > 0 and not st.session_state[f"submitted_{key}"]:
+        st.markdown(f"⏳ Time remaining: `{st.session_state[f'timer_{key}']}` seconds")
+        time.sleep(1)
+        st.session_state[f"timer_{key}"] -= 1
         st.rerun()
 
-# ┌───────────────────────────────────────────────┐
-# │ SECTION 5: Review Screen                      │
-# └───────────────────────────────────────────────┘
+    # Timer expired
+    if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"submitted_{key}"]:
+        st.session_state[f"timeout_{key}"] = True
+        st.session_state.answers[key] = st.session_state[f"answer_{key}"] or ""
+        st.markdown("⏱️ Time's up! Answer saved.")
+        st.markdown("Click **Next** to continue.")
+
+    # Display question
+    st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
+    if question["type"] == "mc":
+        selected = st.radio(question["question"], question["options"], key=f"input_{key}")
+    elif question["type"] == "tf":
+        selected = st.radio(question["question"], ["True", "False"], key=f"input_{key}")
+    else:
+        selected = st.text_input(question["question"], key=f"input_{key}")
+
+    # Save selected answer
+    st.session_state[f"answer_{key}"] = selected
+
+    # Show Submit button only if answer is selected and timer is active
+    if selected and not st.session_state[f"timeout_{key}"] and not st.session_state[f"submitted_{key}"]:
+        if st.button("Submit"):
+            st.session_state.answers[key] = selected
+            st.session_state[f"submitted_{key}"] = True
+            st.session_state.current_question += 1
+            if st.session_state.current_question >= st.session_state.num_questions:
+                st.session_state.quiz_complete = True
+            st.rerun()
+
+    # Show Next button only after timeout
+    if st.session_state[f"timeout_{key}"]:
+        if st.button("Next"):
+            st.session_state.current_question += 1
+            if st.session_state.current_question >= st.session_state.num_questions:
+                st.session_state.quiz_complete = True
+            st.rerun()
+
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 5: Review Screen                                   │
+# │ Purpose: Show correct answers, explanations, and score     │
+# └────────────────────────────────────────────────────────────┘
 
 correct_count = 0
 
@@ -128,7 +166,7 @@ if "questions" in st.session_state and st.session_state.get("quiz_complete"):
 
     for i, q in enumerate(st.session_state.questions):
         key = f"q_{i}"
-        user_answer = st.session_state.answers.get(key, "No answer")
+        user_answer = st.session_state.answers.get(key, "")
         correct_answer = q["answer"]
         is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
 
@@ -149,9 +187,9 @@ if "questions" in st.session_state and st.session_state.get("quiz_complete"):
 
     st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
 
-# ┌───────────────────────────────────────────────┐
-# │ SECTION 6: Leaderboard Tracking               │
-# └───────────────────────────────────────────────┘
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 6: Leaderboard Tracking                            │
+# └────────────────────────────────────────────────────────────┘
 
 if "leaderboard" not in st.session_state:
     st.session_state.leaderboard = []
@@ -196,4 +234,3 @@ for entry in st.session_state.leaderboard:
         f"Score: `{entry['score']}` | Correct: {entry['correct']}/{entry['total']} | "
         f"Time: {entry['time']}s"
     )
-
