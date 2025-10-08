@@ -135,7 +135,7 @@ def generate_pdf(results, score, total, difficulty, name):
 # -----------------------------
 # ✅ Submission and Feedback
 # -----------------------------
-elif "questions" in st.session_state and not st.session_state.submitted and st.session_state.current_q >= len(st.session_state.questions):
+if "questions" in st.session_state and not st.session_state.submitted and st.session_state.current_q >= len(st.session_state.questions):
     score = 0
     results = []
     end_time = time.time()
@@ -199,4 +199,5 @@ elif "questions" in st.session_state and not st.session_state.submitted and st.s
 if st.button("🔄 Start Over"):
     st.session_state.clear()
     st.experimental_rerun()
+
 
