@@ -64,12 +64,15 @@ def update_leaderboard(name, score, time_taken):
 st.title("🧠 TCP/UDP Protocol Quiz")
 st.markdown("Welcome! Test your knowledge of network protocols. Select your difficulty and number of questions to begin.")
 
-# Difficulty and question count controls
 difficulty = st.select_slider("Select difficulty", options=["Easy", "Medium", "Hard"], value="Medium")
 num_questions = st.slider("Number of questions", min_value=3, max_value=len(protocols), value=5)
 
-# Generate quiz button
 if st.button("Generate Quiz"):
+    # ✅ Clear old session keys to avoid leftover data
+    for key in list(st.session_state.keys()):
+        if key.startswith("q_") or key.startswith("user_input_") or key.endswith("_start_time") or key == "trigger_rerun":
+            del st.session_state[key]
+
     def generate_questions(difficulty, num_questions):
         used_indices = set()
         questions = []
@@ -81,7 +84,6 @@ if st.button("Generate Quiz"):
             proto = protocols[idx]
             used_indices.add(idx)
 
-            # Determine question type based on difficulty
             if difficulty == "Easy":
                 q_type = "mc"
             elif difficulty == "Medium":
@@ -89,7 +91,6 @@ if st.button("Generate Quiz"):
             else:
                 q_type = random.choice(["fill", "tf", "layer", "acronym"])
 
-            # Build question
             if q_type == "mc":
                 options = random.sample([p["name"] for p in protocols if p["name"] != proto["name"]], 3)
                 options.append(proto["name"])
@@ -135,7 +136,7 @@ if st.button("Generate Quiz"):
 
         return questions
 
-    # Initialize session state
+    # ✅ Initialize new quiz
     st.session_state.questions = generate_questions(difficulty, num_questions)
     st.session_state.answers = {}
     st.session_state.submitted = False
@@ -146,10 +147,9 @@ if st.button("Generate Quiz"):
 # ⏱️ SECTION 3: Quiz Flow with Timer and Answer Input
 # ============================================================
 
-# 🔁 Safe rerun trigger if timeout or "Next" was clicked
 if st.session_state.get("trigger_rerun"):
     st.session_state.trigger_rerun = False
-    st.stop()  # Safely halt execution to allow Streamlit to rerun
+    st.stop()
 
 if "questions" in st.session_state and not st.session_state.submitted:
     q_index = st.session_state.current_q
@@ -169,33 +169,37 @@ if "questions" in st.session_state and not st.session_state.submitted:
         remaining = max(0, 10 - int(elapsed))
         st.markdown(f"⏳ Time left: {remaining} seconds")
 
-        # 🔁 Auto-refresh every second for countdown
+        # 🔁 Auto-refresh every second
         st_autorefresh(interval=1000, limit=10, key=f"refresh_{key}")
 
-        # Show input field based on question type
+        # ✅ Input field handling
         if q["type"] == "mc":
             answer = st.radio("Choose one:", q["options"], key=key)
         elif q["type"] == "tf":
             answer = st.radio("True or False:", ["True", "False"], key=key)
         else:
-            answer = st.text_input("Your answer:", key=key)
+            input_key = f"user_input_{q_index}"
+            if input_key not in st.session_state:
+                st.session_state[input_key] = ""
+            st.session_state[input_key] = st.text_input("Your answer:", value=st.session_state[input_key])
+            answer = st.session_state[input_key]
 
-        # Auto-submit after timeout
+        # ✅ Auto-submit after timeout
         if remaining == 0 and f"{key}_submitted" not in st.session_state:
-            st.session_state.answers[key] = "No answer"
+            st.session_state.answers[key] = answer if answer else "No answer"
             st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
             st.session_state[start_time_key] = None
-            st.session_state.trigger_rerun = True  # ✅ Set rerun flag
+            st.session_state.trigger_rerun = True
 
-        # Manual Next button
+        # ✅ Manual Next button
         if st.button("Next"):
             if f"{key}_submitted" not in st.session_state:
                 st.session_state.answers[key] = answer if answer else "No answer"
                 st.session_state[f"{key}_submitted"] = True
             st.session_state.current_q += 1
             st.session_state[start_time_key] = None
-            st.session_state.trigger_rerun = True  # ✅ Set rerun flag
+            st.session_state.trigger_rerun = True
 
 # ============================================================
 # ✅ SECTION 4: Submission, Feedback, Leaderboard, PDF Export
@@ -281,6 +285,7 @@ if "questions" in st.session_state:
     if st.button("🔄 Start Over"):
         st.session_state.clear()
         st.experimental_rerun()
+
 
 
 
