@@ -198,7 +198,8 @@ if "questions" in st.session_state and not st.session_state.submitted:
             st.session_state[submitted_key] = True
             st.session_state.current_q += 1
             st.session_state[start_time_key] = None
-            st.experimental_rerun()
+            if st.session_state.current_q < len(st.session_state.questions):
+                st.experimental_rerun()
 
         # Timer expired — show Next button
         if remaining == 0 and submitted_key not in st.session_state:
@@ -209,7 +210,8 @@ if "questions" in st.session_state and not st.session_state.submitted:
                 st.session_state[submitted_key] = True
                 st.session_state.current_q += 1
                 st.session_state[start_time_key] = None
-                st.experimental_rerun()
+                if st.session_state.current_q < len(st.session_state.questions):
+                    st.experimental_rerun()
 
 # ============================================================
 # 🏁 SECTION 4: Quiz Completion
