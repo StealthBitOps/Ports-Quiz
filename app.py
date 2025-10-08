@@ -131,4 +131,6 @@ if st.button("Submit Quiz"):
     st.success(f"✅ You scored {score} out of {len(questions)}")
     for r in results:
         st.markdown(f"**Q:** {r['question']}")
-        st.markdown(f"- Your answer
+        st.markdown(f"- Your answer: `{r['user_answer']}`")
+
+
