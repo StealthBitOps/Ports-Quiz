@@ -53,7 +53,8 @@ def load_leaderboard():
 
 def save_leaderboard(df):
     df_sorted = df.sort_values(by=["Score", "Time"], ascending=[False, True]).head(MAX_LEADERBOARD_ENTRIES)
-    df_sorted.to_html(LEADERBOARD_FILE, index=False)
+    if not df_sorted.empty:
+        df_sorted.to_html(LEADERBOARD_FILE, index=False)
     return df_sorted
 
 # ┌───────────────────────────────────────────────┐
@@ -169,51 +170,50 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         start_key = f"{key}_start"
         submit_key = f"{key}_submitted"
 
-        # Start timer for this question
         if start_key not in st.session_state:
             st.session_state[start_key] = time.time()
 
         elapsed = time.time() - st.session_state[start_key]
         remaining = max(0, 10 - int(elapsed))
 
-        # Force refresh every second for 11 seconds
         if submit_key not in st.session_state and remaining > 0:
             st.markdown(f"⏳ Time remaining: {remaining} seconds")
             st_autorefresh(interval=1000, limit=11, key=f"refresh_{key}")
 
-        st.markdown(f"### Question {q_index + 1} of {len(questions)}")
-        st.markdown(f"**{q['question']}**")
+        with st.container():
+            st.markdown(f"### Question {q_index + 1} of {len(questions)}")
+            st.markdown(f"**{q['question']}**")
 
-        answer = None
-        submitted = False
+            answer = None
+            submitted = False
 
-        if q["type"] in ["mc", "tf"]:
-            options = q["options"]
-            selected = st.radio("Choose one:", options, key=f"radio_{q_index}")
-            answer = selected
-            if remaining > 0 and st.button("Submit"):
-                submitted = True
+            if q["type"] in ["mc", "tf"]:
+                options = q["options"]
+                selected = st.radio("Choose one:", options, key=f"radio_{q_index}")
+                answer = selected
+                if remaining > 0 and st.button("Submit"):
+                    submitted = True
 
-        elif q["type"] == "fill":
-            user_input = st.text_input("Your answer:", key=f"input_{q_index}")
-            answer = user_input
-            if remaining > 0 and st.button("Submit"):
-                submitted = True
+            elif q["type"] == "fill":
+                user_input = st.text_input("Your answer:", key=f"input_{q_index}")
+                answer = user_input
+                if remaining > 0 and st.button("Submit"):
+                    submitted = True
 
-        if submitted and submit_key not in st.session_state:
-            st.session_state.answers[key] = answer if answer else "No answer"
-            st.session_state.total_time += int(elapsed)
-            st.session_state[submit_key] = True
-            st.session_state.current_q += 1
-            st.rerun()
-
-        if remaining == 0 and submit_key not in st.session_state:
-            st.session_state.answers[key] = "No answer"
-            st.session_state.total_time += 10
-            if st.button("Next"):
+            if submitted and submit_key not in st.session_state:
+                st.session_state.answers[key] = answer if answer else "No answer"
+                st.session_state.total_time += int(elapsed)
                 st.session_state[submit_key] = True
                 st.session_state.current_q += 1
                 st.rerun()
+
+            if remaining == 0 and submit_key not in st.session_state:
+                st.session_state.answers[key] = "No answer"
+                st.session_state.total_time += 10
+                if st.button("Next"):
+                    st.session_state[submit_key] = True
+                    st.session_state.current_q += 1
+                    st.rerun()
 
     else:
         st.session_state.quiz_complete = True
@@ -259,19 +259,19 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
         correct_answer = q["answer"]
         is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
 
-        st.markdown(f"### Q{i+1}: {q['question']}")
-        st.markdown(f"- Your answer: `{user_answer}`")
-        st.markdown(f"- Correct answer: `{correct_answer}`")
-        st.markdown(f"- {'✅ Correct!' if is_correct else '❌ Incorrect.'}")
-        st.markdown(f"- Explanation: {q['explanation']['correct']}")
+        with st.container():
+            st.markdown(f"### Q{i+1}: {q['question']}")
+            st.markdown(f"- Your answer: `{user_answer}`")
+            st.markdown(f"- Correct answer: `{correct_answer}`")
+            st.markdown(f"- Explanation: {q['explanation']['correct']}")
 
-        if q["type"] == "mc":
-            for opt in q["options"]:
-                if opt != correct_answer:
-                    wrong_expl = q["explanation"]["wrong"].get(opt)
-                    if wrong_expl:
-                        st.markdown(f"  - ❌ `{opt}`: {wrong_expl}")
-        st.markdown("---")
+            if q["type"] == "mc":
+                for opt in q["options"]:
+                    if opt != correct_answer:
+                        wrong_expl = q["explanation"]["wrong"].get(opt)
+                        if wrong_expl:
+                            st.markdown(f"  - ❌ `{opt}`: {wrong_expl}")
+            st.markdown("---")
 
         if is_correct:
             correct_count += 1
@@ -306,4 +306,7 @@ if "review_ready" in st.session_state and st.session_state.review_ready:
     # 🏆 Leaderboard Preview
     st.markdown("## 🏆 Leaderboard Preview")
     leaderboard = load_leaderboard()
-    st.components.v1.html(leaderboard.to_html(index=False), height=600, scrolling=True)
+    if leaderboard.empty:
+        st.info("Leaderboard is currently empty. Be the first to submit your score!")
+    else:
+        st.components.v1.html(leaderboard.to_html(index=False), height=600, scrolling=True)
