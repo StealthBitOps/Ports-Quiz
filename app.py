@@ -158,15 +158,44 @@ if "questions" in st.session_state and st.session_state.get("quiz_complete"):
 # │ Purpose: Track top 10 attempts by score and show ranking   │
 # └────────────────────────────────────────────────────────────┘
 
+# Initialize leaderboard and attempt counter if missing
 if "leaderboard" not in st.session_state:
     st.session_state.leaderboard = []
 if "attempt_count" not in st.session_state:
     st.session_state.attempt_count = 0
 
-difficulty_weights = {"Easy": 1, "Medium": 2, "Hard": 3}
-elapsed = round(time.time() - st.session_state.start_time, 2)
-score = round((correct_count * difficulty_weights[st.session_state.difficulty]) / max(elapsed, 1), 4)
+# Safely calculate elapsed time
+start_time = st.session_state.get("start_time", time.time())
+elapsed = round(time.time() - start_time, 2)
 
+# Calculate score using difficulty weight
+difficulty_weights = {"Easy": 1, "Medium": 2, "Hard": 3}
+score = round((correct_count * difficulty_weights.get(st.session_state.difficulty, 1)) / max(elapsed, 1), 4)
+
+# Save attempt
 st.session_state.attempt_count += 1
 attempt_name = f"Attempt {st.session_state.attempt_count}"
-st.session
+st.session_state.leaderboard.append({
+    "name": attempt_name,
+    "difficulty": st.session_state.difficulty,
+    "correct": correct_count,
+    "total": len(st.session_state.questions),
+    "time": elapsed,
+    "score": score
+})
+
+# Keep only top 10 attempts
+st.session_state.leaderboard = sorted(
+    st.session_state.leaderboard,
+    key=lambda x: x["score"],
+    reverse=True
+)[:10]
+
+# Display leaderboard
+st.markdown("## 🏆 Leaderboard (Top 10 Attempts)")
+for entry in st.session_state.leaderboard:
+    st.markdown(
+        f"- **{entry['name']}** | Difficulty: {entry['difficulty']} | "
+        f"Score: `{entry['score']}` | Correct: {entry['correct']}/{entry['total']} | "
+        f"Time: {entry['time']}s"
+    )
