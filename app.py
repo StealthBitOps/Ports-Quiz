@@ -14,6 +14,9 @@ protocols = [
     {"name": "DNS", "acronym": "Domain Name System", "port": "53", "layer": "Application", "reliable": False, "description": "Resolves domain names to IP addresses."},
     {"name": "SMTP", "acronym": "Simple Mail Transfer Protocol", "port": "25", "layer": "Application", "reliable": True, "description": "Used for sending emails."},
     {"name": "DHCP", "acronym": "Dynamic Host Configuration Protocol", "port": "67/68", "layer": "Application", "reliable": False, "description": "Assigns IP addresses dynamically."},
+    {"name": "IMAP", "acronym": "Internet Message Access Protocol", "port": "143", "layer": "Application", "reliable": True, "description": "Retrieves email messages from a server."},
+    {"name": "POP3", "acronym": "Post Office Protocol 3", "port": "110", "layer": "Application", "reliable": True, "description": "Downloads email messages to a local device."},
+    {"name": "SNMP", "acronym": "Simple Network Management Protocol", "port": "161", "layer": "Application", "reliable": False, "description": "Monitors and manages network devices."}
 ]
 
 # -----------------------------
@@ -35,7 +38,7 @@ def generate_questions(difficulty, num_questions):
         elif difficulty == "Medium":
             q_type = random.choice(["mc", "fill"])
         else:
-            q_type = random.choice(["fill", "tf"])
+            q_type = random.choice(["fill", "tf", "layer", "acronym"])
 
         if q_type == "mc":
             options = random.sample([p["name"] for p in protocols if p["name"] != proto["name"]], 3)
@@ -54,7 +57,21 @@ def generate_questions(difficulty, num_questions):
                 "type": "fill",
                 "question": f"Which protocol uses port {proto['port']}?",
                 "answer": proto["name"],
-                "explanation": f"{proto['name']} uses port {proto['port']} for {proto['description']}"
+                "explanation": f"{proto['name']} uses port {proto['port']} for {proto['description']}."
+            })
+        elif q_type == "layer":
+            questions.append({
+                "type": "fill",
+                "question": f"Which layer does {proto['name']} operate on?",
+                "answer": proto["layer"],
+                "explanation": f"{proto['name']} operates on the {proto['layer']} layer."
+            })
+        elif q_type == "acronym":
+            questions.append({
+                "type": "fill",
+                "question": f"What does the acronym {proto['name']} stand for?",
+                "answer": proto["acronym"],
+                "explanation": f"{proto['name']} stands for {proto['acronym']}."
             })
         else:
             statement = f"{proto['name']} is {'reliable' if proto['reliable'] else 'unreliable'}."
@@ -97,7 +114,7 @@ def generate_pdf(results, score, total, difficulty):
 st.title("🧠 TCP/UDP Protocol Quiz")
 
 difficulty = st.selectbox("Choose difficulty", ["Easy", "Medium", "Hard"])
-num_questions = st.slider("Number of questions", 3, 7, 5)
+num_questions = st.slider("Number of questions", 3, len(protocols), 5)
 
 if st.button("Generate Quiz"):
     st.session_state.questions = generate_questions(difficulty, num_questions)
@@ -146,15 +163,4 @@ if "questions" in st.session_state and not st.session_state.submitted:
             if r["type"] == "mc":
                 st.markdown("**Option explanations:**")
                 for opt, exp in r["explanations"].items():
-                    st.markdown(f"- `{opt}`: {exp}")
-            else:
-                st.markdown(f"- Explanation: {r['explanation']}")
-            st.markdown("---")
-
-        generate_pdf(results, score, len(st.session_state.questions), difficulty)
-        with open("quiz_results.pdf", "rb") as f:
-            st.download_button("📄 Download PDF Results", f, file_name="quiz_results.pdf")
-
-if st.button("Start Over"):
-    st.session_state.clear()
-    st.experimental_rerun()
+                    st.markdown(f"-
