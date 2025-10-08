@@ -196,8 +196,11 @@ if "questions" in st.session_state and not st.session_state.submitted and st.ses
 # -----------------------------
 # 🔄 Restart Button
 # -----------------------------
-if st.button("🔄 Start Over"):
-    st.session_state.clear()
-    st.experimental_rerun()
+if st.session_state.get("submitted"):
+    if st.button("🔄 Start Over"):
+        st.session_state.clear()
+        st.experimental_rerun()
+
+
 
 
