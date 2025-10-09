@@ -77,16 +77,18 @@ def generate_questions(data, difficulty, count):
     return questions
 
 # ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 4: Welcome Screen                                  │
+# │ SECTION 4: Welcome Screen and Quiz Setup                   │
 # └────────────────────────────────────────────────────────────┘
 
 if "quiz_started" not in st.session_state:
     st.title("🧠 Network Protocol Quiz")
     st.markdown("Test your knowledge of ports, protocols, and OSI layers!")
 
+    # Difficulty and question count selectors
     difficulty = st.select_slider("Choose difficulty", options=["Easy", "Medium", "Hard"])
     num_questions = st.slider("How many questions?", min_value=1, max_value=20, value=5)
 
+    # Start Quiz button
     if st.button("Start Quiz"):
         st.session_state.difficulty = difficulty
         st.session_state.num_questions = num_questions
@@ -98,9 +100,8 @@ if "quiz_started" not in st.session_state:
         st.session_state.ready_for_review = False
         st.session_state.start_time = time.time()
         st.rerun()
-
 # ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 5: Quiz Flow with Timer and Submit Logic           │
+# │ SECTION 5: Quiz Flow with Countdown Timer and Submit Logic │
 # └────────────────────────────────────────────────────────────┘
 
 if st.session_state.get("quiz_started") and not st.session_state.get("quiz_complete"):
@@ -114,11 +115,13 @@ if st.session_state.get("quiz_started") and not st.session_state.get("quiz_compl
     question = questions[q_index]
     key = f"q_{q_index}"
 
+    # Initialize per-question state
     if f"submitted_{key}" not in st.session_state:
         st.session_state[f"submitted_{key}"] = False
         st.session_state[f"answer_{key}"] = ""
         st.session_state[f"timer_start_{key}"] = time.time()
 
+    # Display question
     st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
     if question["type"] == "mc":
         st.radio(question["question"], question["options"], key=f"input_{key}")
@@ -130,6 +133,7 @@ if st.session_state.get("quiz_started") and not st.session_state.get("quiz_compl
     selected = st.session_state.get(f"input_{key}", "")
     st.session_state[f"answer_{key}"] = selected
 
+    # Countdown timer
     if not st.session_state[f"submitted_{key}"]:
         elapsed = int(time.time() - st.session_state[f"timer_start_{key}"])
         remaining = max(0, 10 - elapsed)
@@ -139,11 +143,13 @@ if st.session_state.get("quiz_started") and not st.session_state.get("quiz_compl
             time.sleep(1)
             st.rerun()
         else:
+            # Auto-submit if time runs out
             st.session_state.answers[key] = selected
             st.session_state[f"submitted_{key}"] = True
             st.session_state.current_question += 1
             st.rerun()
 
+    # Submit button
     if not st.session_state[f"submitted_{key}"]:
         submit_disabled = selected is None or selected == ""
         if st.button("Submit", disabled=submit_disabled, key=f"submit_{key}"):
@@ -156,7 +162,6 @@ if st.session_state.get("quiz_started") and not st.session_state.get("quiz_compl
 # │ SECTION 6: Review Trigger and Review Screen                │
 # └────────────────────────────────────────────────────────────┘
 
-# Show "Review Quiz" button after last question is submitted
 if st.session_state.get("ready_for_review") and not st.session_state.get("quiz_complete"):
     st.markdown("## ✅ Quiz Complete")
     st.markdown("You've answered all questions. Click below to review your results.")
@@ -164,7 +169,6 @@ if st.session_state.get("ready_for_review") and not st.session_state.get("quiz_c
         st.session_state.quiz_complete = True
         st.rerun()
 
-# Display full review after "Review Quiz" is clicked
 if st.session_state.get("quiz_complete"):
     st.markdown("## 🔍 Quiz Review")
     correct_count = 0
@@ -197,12 +201,22 @@ if st.session_state.get("quiz_complete"):
     st.session_state.correct_count = correct_count
     st.markdown(f"### 🧮 Final Score: `{correct_count}` out of `{len(st.session_state.questions)}`")
 
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 7: PDF Export                                      │
+# └────────────────────────────────────────────────────────────┘
+
+if st.session_state.get("quiz_complete"):
     st.markdown("## 📄 Export Your Review")
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Network Protocol Quiz Review", ln=True, align="C")
     pdf.ln(10)
+
+    layer_map = {
+        1: "Physical", 2: "Data Link", 3: "Network",
+        4: "Transport", 5: "Session", 6: "Presentation", 7: "Application"
+    }
 
     for i, q in enumerate(st.session_state.questions):
         key = f"q_{i}"
@@ -223,7 +237,7 @@ if st.session_state.get("quiz_complete"):
         pdf.ln(5)
 
     pdf.ln(10)
-    pdf.cell(0, 10, txt=sanitize(f"Final Score: {correct_count} / {len(st.session_state.questions)}"), ln=True)
+    pdf.cell(0, 10, txt=sanitize(f"Final Score: {st.session_state.correct_count} / {len(st.session_state.questions)}"), ln=True)
 
     buffer = BytesIO()
     pdf_output = pdf.output(dest='S').encode('latin1')
@@ -231,6 +245,11 @@ if st.session_state.get("quiz_complete"):
 
     st.download_button("📥 Download PDF", data=buffer.getvalue(), file_name="quiz_review.pdf")
 
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 8: Leaderboard                                     │
+# └────────────────────────────────────────────────────────────┘
+
+if st.session_state.get("quiz_complete"):
     if "leaderboard" not in st.session_state:
         st.session_state.leaderboard = []
     if "attempt_count" not in st.session_state:
@@ -239,7 +258,7 @@ if st.session_state.get("quiz_complete"):
     elapsed = round(time.time() - st.session_state.get("start_time", time.time()), 2)
     difficulty = st.session_state.get("difficulty", "Easy")
     difficulty_weights = {"Easy": 1, "Medium": 2, "Hard": 3}
-    score = round((correct_count * difficulty_weights.get(difficulty, 1)) / max(elapsed, 1), 4)
+    score = round((st.session_state.correct_count * difficulty_weights.get(difficulty, 1)) / max(elapsed, 1), 4)
 
     st.session_state.attempt_count += 1
     attempt_name = f"Attempt {st.session_state.attempt_count}"
@@ -248,7 +267,7 @@ if st.session_state.get("quiz_complete"):
     st.session_state.leaderboard.append({
         "name": attempt_name,
         "difficulty": difficulty,
-        "correct": correct_count,
+        "correct": st.session_state.correct_count,
         "total": total_questions,
         "time": elapsed,
         "score": score
@@ -268,6 +287,11 @@ if st.session_state.get("quiz_complete"):
             f"Time: {entry['time']}s"
         )
 
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 9: Restart Quiz Button                             │
+# └────────────────────────────────────────────────────────────┘
+
+if st.session_state.get("quiz_complete"):
     if st.button("🔁 Restart Quiz"):
         for key in list(st.session_state.keys()):
             if key.startswith("q_") or key.startswith("input_") or key.startswith("submitted_") or key.startswith("answer_") or key.startswith("timer_") or key.startswith("timer_start_"):
