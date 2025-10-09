@@ -84,11 +84,9 @@ if "quiz_started" not in st.session_state:
     st.title("🧠 Network Protocol Quiz")
     st.markdown("Test your knowledge of ports, protocols, and OSI layers!")
 
-    # Difficulty and question count selectors
     difficulty = st.select_slider("Choose difficulty", options=["Easy", "Medium", "Hard"])
     num_questions = st.slider("How many questions?", min_value=1, max_value=20, value=5)
 
-    # Start Quiz button
     if st.button("Start Quiz"):
         st.session_state.difficulty = difficulty
         st.session_state.num_questions = num_questions
@@ -100,6 +98,7 @@ if "quiz_started" not in st.session_state:
         st.session_state.ready_for_review = False
         st.session_state.start_time = time.time()
         st.rerun()
+
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 5: Quiz Flow with Countdown Timer and Submit Logic │
 # └────────────────────────────────────────────────────────────┘
@@ -143,7 +142,6 @@ if st.session_state.get("quiz_started") and not st.session_state.get("quiz_compl
             time.sleep(1)
             st.rerun()
         else:
-            # Auto-submit if time runs out
             st.session_state.answers[key] = selected
             st.session_state[f"submitted_{key}"] = True
             st.session_state.current_question += 1
