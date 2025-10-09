@@ -88,6 +88,7 @@ if "questions" not in st.session_state and not st.session_state.get("quiz_comple
         st.session_state.questions = generate_questions(protocols, difficulty, num_questions)
         st.session_state.quiz_complete = False
         st.rerun()
+        st.stop()
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 4: Quiz Flow with Timer, Submit, and Next Buttons  │
@@ -97,7 +98,6 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
     q_index = st.session_state.current_question
     questions = st.session_state.questions
 
-    # Prevent out-of-range access
     if q_index >= len(questions):
         st.session_state.quiz_complete = True
         st.rerun()
@@ -105,7 +105,6 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
     question = questions[q_index]
     key = f"q_{q_index}"
 
-    # Initialize state for this question
     if f"timer_{key}" not in st.session_state:
         st.session_state[f"timer_{key}"] = 10
         st.session_state[f"submitted_{key}"] = False
@@ -115,14 +114,15 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
     st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
     st.markdown(f"⏳ Time remaining: `{st.session_state[f'timer_{key}']}` seconds")
 
-    # Display question and input
+    # Display input
     if question["type"] == "mc":
-        selected = st.radio(question["question"], question["options"], key=f"input_{key}")
+        st.radio(question["question"], question["options"], key=f"input_{key}")
     elif question["type"] == "tf":
-        selected = st.radio(question["question"], ["True", "False"], key=f"input_{key}")
+        st.radio(question["question"], ["True", "False"], key=f"input_{key}")
     else:
-        selected = st.text_input(question["question"], key=f"input_{key}")
+        st.text_input(question["question"], key=f"input_{key}")
 
+    selected = st.session_state.get(f"input_{key}", "")
     st.session_state[f"answer_{key}"] = selected
 
     # Countdown logic
@@ -136,7 +136,7 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
         st.session_state.answers[key] = selected or ""
         st.session_state[f"timeout_{key}"] = True
 
-    # Submit button (always visible)
+    # Submit button
     submit_disabled = (
         not selected or
         st.session_state[f"submitted_{key}"]
@@ -149,7 +149,7 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
             st.session_state.quiz_complete = True
         st.rerun()
 
-    # Next button (only after timeout and not yet submitted)
+    # Next button
     if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"submitted_{key}"]:
         if st.button("Next", key=f"next_{key}"):
             st.session_state.answers[key] = selected or ""
@@ -238,7 +238,9 @@ if st.session_state.get("quiz_complete"):
     pdf.cell(0, 10, txt=f"Final Score: {st.session_state.correct_count} / {len(st.session_state.questions)}", ln=True)
 
     buffer = BytesIO()
-    pdf.output(buffer)
+    pdf_output = pdf.output(dest='S').encode('latin1')
+    buffer.write(pdf_output)
+
     st.download_button("📥 Download PDF", data=buffer.getvalue(), file_name="quiz_review.pdf")
 
 # ┌────────────────────────────────────────────────────────────┐
@@ -299,4 +301,5 @@ if st.session_state.get("quiz_complete"):
         st.session_state.pop("correct_count", None)
         st.session_state.pop("start_time", None)
         st.rerun()
+
 
