@@ -7,7 +7,9 @@ import random
 import time
 from io import BytesIO
 from fpdf import FPDF
+import unicodedata
 
+# Protocol dataset
 protocols = [
     {"name": "SSH", "acronym": "SSH", "port": "22", "description": "Secure remote login", "osi_layer": 7, "difficulty": "Easy"},
     {"name": "DNS", "acronym": "DNS", "port": "53", "description": "Resolves domain names", "osi_layer": 7, "difficulty": "Easy"},
@@ -69,10 +71,10 @@ def generate_questions(data, difficulty, count):
     return questions
 
 # ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 3: Welcome Screen and Quiz Setup                   │
+# │ SECTION 3: Welcome Screen                                  │
 # └────────────────────────────────────────────────────────────┘
 
-if "questions" not in st.session_state and not st.session_state.get("quiz_complete"):
+if "quiz_started" not in st.session_state:
     st.title("🧠 Network Protocol Quiz")
     st.markdown("Test your knowledge of ports, protocols, and OSI layers!")
 
@@ -84,37 +86,35 @@ if "questions" not in st.session_state and not st.session_state.get("quiz_comple
         st.session_state.num_questions = num_questions
         st.session_state.current_question = 0
         st.session_state.answers = {}
-        st.session_state.start_time = time.time()
         st.session_state.questions = generate_questions(protocols, difficulty, num_questions)
+        st.session_state.quiz_started = True
         st.session_state.quiz_complete = False
+        st.session_state.ready_for_review = False
+        st.session_state.start_time = time.time()
         st.rerun()
         st.stop()
 
 # ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 4: Quiz Flow with Timer, Submit, and Next Buttons  │
+# │ SECTION 4: Quiz Flow                                       │
 # └────────────────────────────────────────────────────────────┘
 
-if "questions" in st.session_state and not st.session_state.quiz_complete:
+if st.session_state.get("quiz_started") and not st.session_state.get("quiz_complete"):
     q_index = st.session_state.current_question
     questions = st.session_state.questions
 
     if q_index >= len(questions):
-        st.session_state.quiz_complete = True
+        st.session_state.ready_for_review = True
         st.rerun()
 
     question = questions[q_index]
     key = f"q_{q_index}"
 
-    if f"timer_{key}" not in st.session_state:
-        st.session_state[f"timer_{key}"] = 10
+    if f"submitted_{key}" not in st.session_state:
         st.session_state[f"submitted_{key}"] = False
-        st.session_state[f"timeout_{key}"] = False
         st.session_state[f"answer_{key}"] = ""
 
     st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
-    st.markdown(f"⏳ Time remaining: `{st.session_state[f'timer_{key}']}` seconds")
 
-    # Display input
     if question["type"] == "mc":
         st.radio(question["question"], question["options"], key=f"input_{key}")
     elif question["type"] == "tf":
@@ -125,49 +125,35 @@ if "questions" in st.session_state and not st.session_state.quiz_complete:
     selected = st.session_state.get(f"input_{key}", "")
     st.session_state[f"answer_{key}"] = selected
 
-    # Countdown logic
-    if st.session_state[f"timer_{key}"] > 0 and not st.session_state[f"submitted_{key}"]:
-        time.sleep(1)
-        st.session_state[f"timer_{key}"] -= 1
-        st.rerun()
-
-    # Timeout reached
-    if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"timeout_{key}"]:
-        st.session_state.answers[key] = selected or ""
-        st.session_state[f"timeout_{key}"] = True
-
-    # Submit button
-    submit_disabled = (
-        not selected or
-        st.session_state[f"submitted_{key}"]
-    )
+    submit_disabled = not selected or st.session_state[f"submitted_{key}"]
     if st.button("Submit", disabled=submit_disabled, key=f"submit_{key}"):
         st.session_state.answers[key] = selected
         st.session_state[f"submitted_{key}"] = True
         st.session_state.current_question += 1
         if st.session_state.current_question >= st.session_state.num_questions:
-            st.session_state.quiz_complete = True
+            st.session_state.ready_for_review = True
         st.rerun()
 
-    # Next button
-    if st.session_state[f"timer_{key}"] == 0 and not st.session_state[f"submitted_{key}"]:
-        if st.button("Next", key=f"next_{key}"):
-            st.session_state.answers[key] = selected or ""
-            if st.session_state.current_question + 1 >= st.session_state.num_questions:
-                st.session_state.quiz_complete = True
-            else:
-                st.session_state.current_question += 1
-            st.rerun()
-
 # ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 5: Review Screen                                   │
+# │ SECTION 5: Review Trigger                                  │
 # └────────────────────────────────────────────────────────────┘
 
-correct_count = 0
+if st.session_state.get("ready_for_review") and not st.session_state.get("quiz_complete"):
+    st.markdown("## ✅ Quiz Complete")
+    if st.button("Review Quiz"):
+        st.session_state.quiz_complete = True
+        st.rerun()
 
-if "questions" in st.session_state and st.session_state.get("quiz_complete"):
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 6: Review Screen                                   │
+# └────────────────────────────────────────────────────────────┘
+
+def sanitize(text):
+    return unicodedata.normalize("NFKD", text).encode("latin1", "ignore").decode("latin1")
+
+if st.session_state.get("quiz_complete"):
     st.markdown("## 🔍 Quiz Review")
-
+    correct_count = 0
     layer_map = {
         1: "Physical", 2: "Data Link", 3: "Network",
         4: "Transport", 5: "Session", 6: "Presentation", 7: "Application"
@@ -194,54 +180,8 @@ if "questions" in st.session_state and st.session_state.get("quiz_complete"):
         if is_correct:
             correct_count += 1
 
-    st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
     st.session_state.correct_count = correct_count
-
-# ┌────────────────────────────────────────────────────────────┐
-# │ SECTION 6: PDF Export                                      │
-# └────────────────────────────────────────────────────────────┘
-
-if st.session_state.get("quiz_complete"):
-    st.markdown("## 📄 Export Your Review")
-    st.markdown("Click the button below to download a PDF summary of your quiz results.")
-
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Network Protocol Quiz Review", ln=True, align="C")
-    pdf.ln(10)
-
-    layer_map = {
-        1: "Physical", 2: "Data Link", 3: "Network",
-        4: "Transport", 5: "Session", 6: "Presentation", 7: "Application"
-    }
-
-    for i, q in enumerate(st.session_state.questions):
-        key = f"q_{i}"
-        user_answer = st.session_state.answers.get(key, "")
-        correct_answer = q["answer"]
-        is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
-        result = "Correct" if is_correct else "Incorrect"
-
-        pdf.multi_cell(0, 10, txt=f"Q{i+1}: {q['question']}")
-        pdf.multi_cell(0, 10, txt=f"Your Answer: {user_answer}")
-        pdf.multi_cell(0, 10, txt=f"Correct Answer: {correct_answer}")
-        pdf.multi_cell(0, 10, txt=f"Result: {result}")
-        pdf.multi_cell(0, 10, txt=f"Explanation: {q['explanation']}")
-        pdf.multi_cell(0, 10, txt=f"Port(s): {q['port']}")
-        pdf.multi_cell(0, 10, txt=f"Protocol Description: {q['description']}")
-        pdf.multi_cell(0, 10, txt=f"OSI Layer: {layer_map.get(q['osi_layer'], 'Unknown')} (Layer {q['osi_layer']})")
-        pdf.multi_cell(0, 10, txt=f"Question Type: {q['type'].upper()}")
-        pdf.ln(5)
-
-    pdf.ln(10)
-    pdf.cell(0, 10, txt=f"Final Score: {st.session_state.correct_count} / {len(st.session_state.questions)}", ln=True)
-
-    buffer = BytesIO()
-    pdf_output = pdf.output(dest='S').encode('latin1')
-    buffer.write(pdf_output)
-
-    st.download_button("📥 Download PDF", data=buffer.getvalue(), file_name="quiz_review.pdf")
+    st.markdown(f"### 🧮 Final Score: {correct_count} / {len(st.session_state.questions)}")
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 7: Leaderboard                                     │
@@ -292,14 +232,58 @@ if st.session_state.get("quiz_complete"):
 if st.session_state.get("quiz_complete"):
     if st.button("🔁 Restart Quiz"):
         for key in list(st.session_state.keys()):
-            if key.startswith("q_") or key.startswith("timer_") or key.startswith("submitted_") or key.startswith("timeout_") or key.startswith("answer_"):
+            if key.startswith("q_") or key.startswith("input_") or key.startswith("submitted_") or key.startswith("answer_"):
                 del st.session_state[key]
-        st.session_state.pop("questions", None)
-        st.session_state.pop("answers", None)
-        st.session_state.pop("current_question", None)
-        st.session_state.pop("quiz_complete", None)
-        st.session_state.pop("correct_count", None)
-        st.session_state.pop("start_time", None)
+        for flag in ["questions", "answers", "current_question", "quiz_complete", "quiz_started", "ready_for_review", "correct_count", "start_time"]:
+            st.session_state.pop(flag, None)
         st.rerun()
 
+# ┌────────────────────────────────────────────────────────────┐
+# │ SECTION 9: PDF Export                                      │
+# └────────────────────────────────────────────────────────────┘
+
+if st.session_state.get("quiz_complete"):
+    st.markdown("## 📄 Export Your Review")
+    st.markdown("Click the button below to download a PDF summary of your quiz results.")
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Network Protocol Quiz Review", ln=True, align="C")
+    pdf.ln(10)
+
+    layer_map = {
+        1: "Physical", 2: "Data Link", 3: "Network",
+        4: "Transport", 5: "Session", 6: "Presentation", 7: "Application"
+    }
+
+    def sanitize(text):
+        return unicodedata.normalize("NFKD", text).encode("latin1", "ignore").decode("latin1")
+
+    for i, q in enumerate(st.session_state.questions):
+        key = f"q_{i}"
+        user_answer = st.session_state.answers.get(key, "")
+        correct_answer = q["answer"]
+        is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
+        result = "Correct" if is_correct else "Incorrect"
+
+        pdf.multi_cell(0, 10, txt=sanitize(f"Q{i+1}: {q['question']}"))
+        pdf.multi_cell(0, 10, txt=sanitize(f"Your Answer: {user_answer}"))
+        pdf.multi_cell(0, 10, txt=sanitize(f"Correct Answer: {correct_answer}"))
+        pdf.multi_cell(0, 10, txt=sanitize(f"Result: {result}"))
+        pdf.multi_cell(0, 10, txt=sanitize(f"Explanation: {q['explanation']}"))
+        pdf.multi_cell(0, 10, txt=sanitize(f"Port(s): {q['port']}"))
+        pdf.multi_cell(0, 10, txt=sanitize(f"Protocol Description: {q['description']}"))
+        pdf.multi_cell(0, 10, txt=sanitize(f"OSI Layer: {layer_map.get(q['osi_layer'], 'Unknown')} (Layer {q['osi_layer']})"))
+        pdf.multi_cell(0, 10, txt=sanitize(f"Question Type: {q['type'].upper()}"))
+        pdf.ln(5)
+
+    pdf.ln(10)
+    pdf.cell(0, 10, txt=sanitize(f"Final Score: {st.session_state.correct_count} / {len(st.session_state.questions)}"), ln=True)
+
+    buffer = BytesIO()
+    pdf_output = pdf.output(dest='S').encode('latin1')
+    buffer.write(pdf_output)
+
+    st.download_button("📥 Download PDF", data=buffer.getvalue(), file_name="quiz_review.pdf")
 
