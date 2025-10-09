@@ -109,6 +109,7 @@ if st.session_state.get("quiz_started") and not st.session_state.get("quiz_compl
     q_index = st.session_state.current_question
     questions = st.session_state.questions
 
+    # End quiz if all questions answered
     if q_index >= len(questions):
         st.session_state.ready_for_review = True
         st.rerun()
@@ -116,24 +117,13 @@ if st.session_state.get("quiz_started") and not st.session_state.get("quiz_compl
     question = questions[q_index]
     key = f"q_{q_index}"
 
-    # Initialize per-question state
+    # Initialize state for this question
     if f"submitted_{key}" not in st.session_state:
         st.session_state[f"submitted_{key}"] = False
         st.session_state[f"answer_{key}"] = ""
-        st.session_state[f"timer_{key}"] = 10
         st.session_state[f"timer_start_{key}"] = time.time()
 
-    # Countdown timer
-    if not st.session_state[f"submitted_{key}"]:
-        elapsed = int(time.time() - st.session_state[f"timer_start_{key}"])
-        remaining = max(0, 10 - elapsed)
-        st.session_state[f"timer_{key}"] = remaining
-        st.markdown(f"⏳ Time remaining: `{remaining}` seconds")
-        if remaining > 0:
-            time.sleep(1)
-            st.rerun()
-
-    # Display question and input
+    # Display question
     st.markdown(f"### Question {q_index + 1} of {st.session_state.num_questions}")
     if question["type"] == "mc":
         st.radio(question["question"], question["options"], key=f"input_{key}")
@@ -145,14 +135,30 @@ if st.session_state.get("quiz_started") and not st.session_state.get("quiz_compl
     selected = st.session_state.get(f"input_{key}", "")
     st.session_state[f"answer_{key}"] = selected
 
-    # Submit button logic
-    submit_disabled = not selected or st.session_state[f"submitted_{key}"]
-    if st.button("Submit", disabled=submit_disabled, key=f"submit_{key}"):
-        st.session_state.answers[key] = selected
-        st.session_state[f"submitted_{key}"] = True
-        st.session_state.current_question += 1
-        st.session_state[f"timer_{key}"] = 0
-        st.rerun()
+    # Countdown timer (only if not submitted)
+    if not st.session_state[f"submitted_{key}"]:
+        elapsed = int(time.time() - st.session_state[f"timer_start_{key}"])
+        remaining = max(0, 10 - elapsed)
+        st.markdown(f"⏳ Time remaining: `{remaining}` seconds")
+
+        if remaining > 0:
+            time.sleep(1)
+            st.rerun()
+        else:
+            # Auto-submit if time runs out
+            st.session_state.answers[key] = selected
+            st.session_state[f"submitted_{key}"] = True
+            st.session_state.current_question += 1
+            st.rerun()
+
+    # Submit button (only if timer is running)
+    if not st.session_state[f"submitted_{key}"]:
+        submit_disabled = selected is None or selected == ""
+        if st.button("Submit", disabled=submit_disabled, key=f"submit_{key}"):
+            st.session_state.answers[key] = selected
+            st.session_state[f"submitted_{key}"] = True
+            st.session_state.current_question += 1
+            st.rerun()
 
 # ┌────────────────────────────────────────────────────────────┐
 # │ SECTION 5: Review Trigger and Review Screen                │
@@ -297,5 +303,6 @@ if st.session_state.get("quiz_complete"):
         for flag in ["questions", "answers", "current_question", "quiz_complete", "quiz_started", "ready_for_review", "correct_count", "start_time", "difficulty", "num_questions"]:
             st.session_state.pop(flag, None)
         st.rerun()
+
 
 
